@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Route Planner · ZeroDelay</title>
+  <meta name="description" content="Multi-modal route generation with real-time 3D globe visualization. Plan optimal routes across Road, Rail, and Sea transport modes." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ─── Route Planner Layout ─────────────────── */
+    #app-body {
+      display: flex;
+      height: calc(100vh - 64px);
+      margin-top: 64px;
+      overflow: hidden;
+    }
+
+    /* ─── Left Sidebar ─────────────────────────── */
+    .sidebar-left {
+      width: 310px;
+      flex-shrink: 0;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .sidebar-section {
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-section-title {
+      padding: 14px 20px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--cyan);
+    }
+    .sidebar-section-body {
+      padding: 0 20px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Optimize toggles */
+    .opt-row { display: flex; gap: 4px; }
+    .opt-btn {
+      flex: 1;
+      padding: 8px 0;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all .2s;
+    }
+    .opt-btn.active {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: var(--cyan-dim);
+    }
+
+    /* Compute Button */
+    #compute-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--cyan), #0070ff);
+      border: none;
+      color: #000;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      border-radius: var(--radius);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all .3s;
+    }
+    #compute-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 30px rgba(0,229,255,.3);
+    }
+    #compute-btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    #compute-btn .progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      background: rgba(255,255,255,.5);
+      width: 0%;
+      transition: width 2.5s ease-in-out;
+    }
+
+    /* Mode toggle items */
+    .mode-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .mode-toggle.road  { border-left: 3px solid var(--road); }
+    .mode-toggle.rail  { border-left: 3px solid var(--rail); }
+    .mode-toggle.sea   { border-left: 3px solid var(--sea);  }
+    .mode-toggle:hover { background: rgba(255,255,255,.02); }
+    .mode-toggle-label {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mode-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .2s;
+    }
+    .mode-toggle.on .mode-check {
+      background: var(--cyan);
+      border-color: var(--cyan);
+      color: #000;
+    }
+
+    /* ─── Globe Viewport ───────────────────────── */
+    #globe-viewport {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(ellipse at 40% 40%, #0d1830 0%, var(--bg) 70%);
+    }
+    #globe-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Floating status chips */
+    .viewport-chips {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 5;
+    }
+    .v-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(11,14,26,.88);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 14px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .v-chip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Map toggle button */
+    .globe-bottom-btns {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 5;
+    }
+    .globe-action-btn {
+      padding: 10px 20px;
+      background: rgba(11,14,26,.85);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      color: var(--cyan);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      backdrop-filter: blur(10px);
+      transition: all .2s;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .globe-action-btn:hover {
+      border-color: var(--cyan);
+      background: var(--cyan-dim);
+    }
+
+    /* Map panel */
+    #map-panel {
+      position: absolute;
+      bottom: 60px;
+      right: 16px;
+      width: 440px;
+      height: 280px;
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      z-index: 5;
+      display: none;
+      box-shadow: var(--shadow-lg);
+    }
+    #map-panel.open { display: block; }
+    #leaflet-map { width: 100%; height: 100%; }
+
+    /* ─── Right Sidebar ────────────────────────── */
+    .sidebar-right {
+      width: 340px;
+      flex-shrink: 0;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .results-header {
+      padding: 14px 20px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--cyan);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #results-body {
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
+
+    /* Bar row inside route cards */
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .bar-track {
+      flex: 1;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 1s cubic-bezier(.22,1,.36,1);
+    }
+    .bar-label {
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* ─── Live Tracking HUD ───────────────────── */
+    #live-tracking-chip {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(11,14,26,.92);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      z-index: 5;
+      display: none;
+      gap: 12px;
+      align-items: center;
+      font-size: 11px;
+      max-width: 360px;
+    }
+    #live-tracking-chip.active { display: flex; }
+    .live-pulse {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: livePulse 1.5s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .5; transform: scale(1.4); }
+    }
+    .live-info { display: flex; flex-direction: column; gap: 2px; }
+    .live-mode { font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .live-coords { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+    /* ─── Weather Badge ───────────────────────── */
+    .weather-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 6px; padding: 6px 10px;
+      background: rgba(255,255,255,.03);
+      border-radius: var(--radius-sm);
+      font-size: 10px; color: var(--muted);
+    }
+    .weather-icon { font-size: 16px; }
+    .weather-temp { font-weight: 600; color: var(--text); font-family: var(--mono); }
+    .weather-wind { color: var(--muted); }
+
+    /* ─── LIVE badge on route cards ────────────── */
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 9px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; padding: 2px 8px;
+      border-radius: 4px; color: #10b981;
+      background: rgba(16,185,129,.1);
+      border: 1px solid rgba(16,185,129,.25);
+    }
+    .live-badge-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #10b981; animation: livePulse 1.5s infinite;
+    }
+
+    /* ─── Data source label ────────────────────── */
+    .source-badge {
+      display: inline-block; font-size: 9px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 4px;
+    }
+    .source-badge.osrm { color: #00e5ff; background: rgba(0,229,255,.1); border: 1px solid rgba(0,229,255,.2); }
+    .source-badge.mock { color: #f97316; background: rgba(249,115,22,.1); border: 1px solid rgba(249,115,22,.2); }
+    .source-badge.weather { color: #a78bfa; background: rgba(167,139,250,.1); border: 1px solid rgba(167,139,250,.2); }
+
+    /* ─── Responsive override ──────────────────── */
+    @media (max-width: 1100px) {
+      .sidebar-right { width: 280px; }
+      .sidebar-left { width: 260px; }
+    }
+    @media (max-width: 800px) {
+      #app-body { flex-direction: column; height: auto; min-height: calc(100vh - 64px); }
+      .sidebar-left, .sidebar-right { width: 100%; max-height: 40vh; }
+      #globe-viewport { min-height: 350px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/><path d="M2 17L12 22L22 17" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/><path d="M2 12L12 17L22 12" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/><defs><linearGradient id="g1" x1="2" y1="2" x2="22" y2="22"><stop stop-color="#00e5ff"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs></svg>
+        </div>
+        <div>
+          <div class="brand-name">ZERODELAY</div>
+          <div class="brand-sub">Smart Supply Chain</div>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">Dashboard</a>
+        <a href="routes.html" class="nav-link active">Route Planner</a>
+        <a href="cost.html" class="nav-link">Cost Analysis</a>
+        <a href="ai-insights.html" class="nav-link">AI Insights</a>
+      </div>
+      <div class="nav-status">
+        <div class="status-dot"></div>
+        <span>System Online</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- App Body -->
+  <div id="app-body">
+
+    <!-- Left Sidebar: Route Configuration -->
+    <div class="sidebar-left">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Route Configuration</div>
+        <div class="sidebar-section-body">
+          <div>
+            <label>Origin</label>
+            <input id="origin-input" type="text" placeholder="e.g. Mumbai, India" />
+            <div class="coord-preview" id="origin-coords" style="margin-top:6px">Enter origin above</div>
+          </div>
+          <div>
+            <label>Destination</label>
+            <input id="dest-input" type="text" placeholder="e.g. Shanghai, China" />
+            <div class="coord-preview" id="dest-coords" style="margin-top:6px">Enter destination above</div>
+          </div>
+          <div>
+            <label>Optimize For</label>
+            <div class="opt-row">
+              <button class="opt-btn active" data-opt="balanced">Balanced</button>
+              <button class="opt-btn" data-opt="cost">Cost</button>
+              <button class="opt-btn" data-opt="time">Time</button>
+            </div>
+          </div>
+          <div>
+            <label>Cargo Type</label>
+            <select id="cargo-type">
+              <option value="general">General Freight</option>
+              <option value="perishable">Perishable Goods</option>
+              <option value="heavy">Heavy Machinery</option>
+              <option value="hazmat">Hazardous Materials</option>
+              <option value="bulk">Bulk Commodities</option>
+            </select>
+          </div>
+          <div>
+            <label>Weight (tonnes)</label>
+            <input id="cargo-weight" type="number" placeholder="e.g. 20" value="20" min="1" max="50000" />
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-body" style="padding-top:16px">
+          <button id="compute-btn" onclick="computeRoutes()">
+            <span id="btn-label">⚡ Compute Routes</span>
+            <div class="progress-bar" id="btn-bar"></div>
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Transport Modes</div>
+        <div class="sidebar-section-body">
+          <div class="mode-toggle road on" id="m-road" onclick="toggleMode('road')">
+            <span class="mode-toggle-label">🚛 Road</span>
+            <div class="mode-check">✓</div>
+          </div>
+          <div class="mode-toggle rail on" id="m-rail" onclick="toggleMode('rail')">
+            <span class="mode-toggle-label">🚂 Rail</span>
+            <div class="mode-check">✓</div>
+          </div>
+          <div class="mode-toggle sea on" id="m-sea" onclick="toggleMode('sea')">
+            <span class="mode-toggle-label">🚢 Sea</span>
+            <div class="mode-check">✓</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">API Endpoint</div>
+        <div class="sidebar-section-body">
+          <input id="api-url" type="text" value="http://localhost:5000" />
+          <div style="font-size:10px;color:var(--muted);line-height:1.5">
+            Connect to your Flask backend. Falls back to OSRM + mock data if unavailable.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Globe Viewport -->
+    <div id="globe-viewport">
+      <canvas id="globe-canvas"></canvas>
+
+      <div class="viewport-chips">
+        <div class="v-chip" id="status-chip">
+          <div class="v-chip-dot" style="background:var(--green)"></div>
+          <span id="status-txt">Globe Ready · Drag to Rotate</span>
+        </div>
+        <div class="v-chip" id="route-chip" style="display:none">
+          <div class="v-chip-dot" style="background:var(--cyan);animation:pulse-dot 1.5s infinite"></div>
+          <span id="route-chip-txt">--</span>
+        </div>
+      </div>
+
+      <!-- Live Tracking HUD -->
+      <div id="live-tracking-chip">
+        <div class="live-pulse"></div>
+        <div class="live-info">
+          <div class="live-mode" id="live-mode-txt">--</div>
+          <div class="live-coords" id="live-coords-txt">--</div>
+        </div>
+      </div>
+
+      <div class="globe-bottom-btns">
+        <button class="globe-action-btn" id="reset-view-btn" onclick="resetView()" style="display:none">
+          🌍 <span>Reset View</span>
+        </button>
+        <button class="globe-action-btn" id="map-toggle-btn" onclick="toggleMap()">
+          🗺 <span id="map-btn-txt">Show Map</span>
+        </button>
+      </div>
+
+      <div id="map-panel">
+        <div id="leaflet-map"></div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar: Results -->
+    <div class="sidebar-right">
+      <div class="results-header">Analysis Results</div>
+      <div id="results-body">
+        <div class="empty-state">
+          <div class="empty-icon">📡</div>
+          <div class="empty-title">Awaiting Input</div>
+          <div class="empty-subtitle">Enter origin & destination<br>then click Compute Routes</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="main.js"></script>
+  <script>
+  /* ══════════════════════════════════════════════════
+     THREE.JS GLOBE
+  ══════════════════════════════════════════════════ */
+  const canvas = document.getElementById('globe-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(canvas.offsetWidth, canvas.offsetHeight);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, canvas.offsetWidth / canvas.offsetHeight, 0.1, 500);
+  let tgtZ = 4.5, curZ = 4.5;
+  camera.position.z = curZ;
+
+  window.addEventListener('resize', () => {
+    renderer.setSize(canvas.offsetWidth, canvas.offsetHeight);
+    camera.aspect = canvas.offsetWidth / canvas.offsetHeight;
+    camera.updateProjectionMatrix();
+  });
+
+  const GLOBE_R = 1;
+  const globeG = new THREE.Group();
+  scene.add(globeG);
+
+  /* ── Texture Loader ── */
+  const texLoader = new THREE.TextureLoader();
+  const EARTH_TEX_URL = 'https://unpkg.com/three-globe@2.31.1/example/img/earth-blue-marble.jpg';
+  const EARTH_BUMP_URL = 'https://unpkg.com/three-globe@2.31.1/example/img/earth-topology.png';
+  const CLOUD_TEX_URL = 'https://unpkg.com/three-globe@2.31.1/example/img/earth-water.png';
+
+  /* ── Earth sphere with realistic texture ── */
+  const sphGeo = new THREE.SphereGeometry(GLOBE_R, 80, 80);
+  const sphMat = new THREE.MeshPhongMaterial({
+    color: 0xffffff,
+    shininess: 25,
+    specular: new THREE.Color(0x222244),
+  });
+  const earthMesh = new THREE.Mesh(sphGeo, sphMat);
+  globeG.add(earthMesh);
+
+  texLoader.load(EARTH_TEX_URL, tex => {
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    sphMat.map = tex;
+    sphMat.needsUpdate = true;
+  }, undefined, () => {
+    sphMat.color.set(0x0a1628);
+    sphMat.emissive.set(0x030812);
+  });
+
+  texLoader.load(EARTH_BUMP_URL, tex => {
+    sphMat.bumpMap = tex;
+    sphMat.bumpScale = 0.015;
+    sphMat.needsUpdate = true;
+  });
+
+  /* ── Cloud layer ── */
+  const cloudGeo = new THREE.SphereGeometry(GLOBE_R + 0.006, 64, 64);
+  const cloudMat = new THREE.MeshPhongMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.18,
+    depthWrite: false,
+  });
+  const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+  globeG.add(cloudMesh);
+  texLoader.load(CLOUD_TEX_URL, tex => {
+    cloudMat.alphaMap = tex;
+    cloudMat.needsUpdate = true;
+  });
+
+  /* ── Atmosphere glow ── */
+  const atmosInner = new THREE.Mesh(
+    new THREE.SphereGeometry(GLOBE_R + 0.03, 48, 48),
+    new THREE.MeshPhongMaterial({ color: 0x0088cc, transparent: true, opacity: 0.08, side: THREE.BackSide, depthWrite: false })
+  );
+  globeG.add(atmosInner);
+  const atmosOuter = new THREE.Mesh(
+    new THREE.SphereGeometry(GLOBE_R + 0.12, 48, 48),
+    new THREE.MeshPhongMaterial({ color: 0x00aaff, transparent: true, opacity: 0.04, side: THREE.BackSide, depthWrite: false })
+  );
+  globeG.add(atmosOuter);
+  const atmosBright = new THREE.Mesh(
+    new THREE.SphereGeometry(GLOBE_R + 0.06, 48, 48),
+    new THREE.MeshPhongMaterial({ color: 0x44bbff, transparent: true, opacity: 0.06, side: THREE.BackSide, depthWrite: false })
+  );
+  globeG.add(atmosBright);
+
+  /* ── Hub dots ── */
+  const HUBS = [
+    { name: 'Mumbai', lat: 19.0, lng: 72.8 }, { name: 'Shanghai', lat: 31.2, lng: 121.5 },
+    { name: 'Singapore', lat: 1.35, lng: 103.8 }, { name: 'Rotterdam', lat: 51.9, lng: 4.5 },
+    { name: 'Dubai', lat: 25.2, lng: 55.3 }, { name: 'Los Angeles', lat: 34.0, lng: -118.2 },
+    { name: 'New York', lat: 40.7, lng: -74.0 }, { name: 'Hong Kong', lat: 22.3, lng: 114.2 },
+    { name: 'London', lat: 51.5, lng: -.1 }, { name: 'Tokyo', lat: 35.7, lng: 139.7 },
+    { name: 'Sydney', lat: -33.9, lng: 151.2 }, { name: 'Sao Paulo', lat: -23.5, lng: -46.6 },
+    { name: 'Nairobi', lat: -1.3, lng: 36.8 }, { name: 'Cairo', lat: 30.0, lng: 31.2 },
+    { name: 'Guangzhou', lat: 23.1, lng: 113.3 },
+  ];
+
+  const hubGrp = new THREE.Group();
+  globeG.add(hubGrp);
+  HUBS.forEach(h => {
+    const pos = llV3(h.lat, h.lng, GLOBE_R + .005);
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(.006, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0x00e5ff })
+    );
+    dot.position.copy(pos);
+    hubGrp.add(dot);
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(.012, .016, 16),
+      new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: .25, side: THREE.DoubleSide })
+    );
+    ring.position.copy(pos);
+    ring.lookAt(pos.clone().multiplyScalar(2));
+    hubGrp.add(ring);
+  });
+
+  /* ── Stars ── */
+  (() => {
+    const verts = [];
+    for (let i = 0; i < 5000; i++) {
+      const r = 50 + Math.random() * 200;
+      const t = Math.random() * Math.PI * 2, p = Math.acos(2 * Math.random() - 1);
+      verts.push(r * Math.sin(p) * Math.cos(t), r * Math.cos(p), r * Math.sin(p) * Math.sin(t));
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: .18, transparent: true, opacity: .5 })));
+  })();
+
+  /* ── Lighting ── */
+  scene.add(new THREE.AmbientLight(0x334466, 0.6));
+  const sunLight = new THREE.DirectionalLight(0xfff5e0, 1.8);
+  sunLight.position.set(5, 3, 4);
+  scene.add(sunLight);
+  const fillLight = new THREE.DirectionalLight(0x223355, 0.5);
+  fillLight.position.set(-4, -2, -3);
+  scene.add(fillLight);
+  const rimLight = new THREE.DirectionalLight(0x3399ff, 0.3);
+  rimLight.position.set(-3, 1, 4);
+  scene.add(rimLight);
+
+  /* lat/lng → Vector3 */
+  function llV3(lat, lng, r) {
+    const phi = (90 - lat) * (Math.PI / 180);
+    const theta = (lng + 180) * (Math.PI / 180);
+    return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
+  }
+
+  /* ══════════════════════════════════════════════════
+     OSRM API CLIENT — Real road routing (free, no key)
+  ══════════════════════════════════════════════════ */
+  async function fetchOSRMRoute(waypoints) {
+    // waypoints: [[lat,lng], [lat,lng], ...]
+    const coordStr = waypoints.map(w => `${w[1]},${w[0]}`).join(';');
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson&steps=false`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    if (data.code !== 'Ok' || !data.routes.length) throw new Error('OSRM error');
+    const route = data.routes[0];
+    // GeoJSON coords are [lng, lat] — convert to [lat, lng]
+    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    return {
+      coords,
+      distance_m: route.distance,
+      duration_s: route.duration,
+    };
+  }
+
+  /* ══════════════════════════════════════════════════
+     MARITIME WAYPOINT ENGINE — Sea route through chokepoints
+  ══════════════════════════════════════════════════ */
+  const SEA_CHOKEPOINTS = {
+    aden:       { lat: 12.8,  lng: 45.0 },
+    suez_s:     { lat: 29.9,  lng: 32.6 },
+    suez_n:     { lat: 31.3,  lng: 32.3 },
+    gibraltar:  { lat: 36.0,  lng: -5.6 },
+    english_ch: { lat: 50.9,  lng: 1.4 },
+    cape:       { lat: -34.3, lng: 18.5 },
+    hormuz:     { lat: 26.5,  lng: 56.3 },
+    colombo:    { lat: 6.9,   lng: 79.8 },
+    malacca:    { lat: 2.5,   lng: 101.0 },
+    singapore:  { lat: 1.3,   lng: 103.8 },
+    ho_chi_minh:{ lat: 10.3,  lng: 107.0 },
+    panama_pac: { lat: 8.95,  lng: -79.6 },
+    panama_atl: { lat: 9.35,  lng: -79.9 },
+    azores:     { lat: 38.7,  lng: -27.2 },
+    canary:     { lat: 28.1,  lng: -15.4 },
+    hawaii:     { lat: 21.3,  lng: -157.8 },
+    guam:       { lat: 13.4,  lng: 144.8 },
+  };
+
+  function classifyOceanRegion(lat, lng) {
+    if (lng >= 60  && lng <= 100 && lat >= -10 && lat <= 40) return 'south_asia';
+    if (lng >= 100 && lng <= 145 && lat >= -10 && lat <= 50) return 'east_asia';
+    if (lng >= -15 && lng <= 40  && lat >= 35  && lat <= 70) return 'europe';
+    if (lng >= 30  && lng <= 65  && lat >= 10  && lat <= 35) return 'middle_east';
+    if (lng >= -130&& lng <= -60 && lat >= 25  && lat <= 55) return 'north_america_east';
+    if (lng >= -130&& lng <= -100&& lat >= 25  && lat <= 55) return 'north_america_west';
+    if (lng >= -85 && lng <= -30 && lat >= -40 && lat <= 15) return 'south_america';
+    if (lng >= -25 && lng <= 55  && lat >= -40 && lat <= 25) return 'africa';
+    if (lng >= 100 && lng <= 180 && lat >= -50 && lat <= -10) return 'oceania';
+    return 'other';
+  }
+
+  // Predefined shipping corridors between region pairs
+  const SEA_CORRIDORS = {
+    'south_asia|east_asia':          ['colombo', 'malacca', 'singapore', 'ho_chi_minh'],
+    'south_asia|europe':             ['aden', 'suez_s', 'suez_n', 'gibraltar', 'english_ch'],
+    'south_asia|middle_east':        ['hormuz'],
+    'south_asia|africa':             ['aden', 'cape'],
+    'south_asia|north_america_east': ['aden', 'suez_s', 'suez_n', 'gibraltar', 'azores'],
+    'south_asia|north_america_west': ['colombo', 'malacca', 'singapore', 'guam', 'hawaii'],
+    'south_asia|oceania':            ['colombo', 'malacca', 'singapore'],
+    'east_asia|europe':              ['singapore', 'malacca', 'colombo', 'aden', 'suez_s', 'suez_n', 'gibraltar', 'english_ch'],
+    'east_asia|middle_east':         ['singapore', 'malacca', 'colombo', 'hormuz'],
+    'east_asia|north_america_east':  ['singapore', 'malacca', 'colombo', 'aden', 'suez_s', 'suez_n', 'gibraltar', 'azores'],
+    'east_asia|north_america_west':  ['guam', 'hawaii'],
+    'east_asia|africa':              ['singapore', 'malacca', 'colombo', 'aden', 'cape'],
+    'east_asia|south_america':       ['singapore', 'malacca', 'colombo', 'cape'],
+    'east_asia|oceania':             ['singapore'],
+    'europe|north_america_east':     ['english_ch', 'azores'],
+    'europe|north_america_west':     ['gibraltar', 'azores', 'panama_atl', 'panama_pac'],
+    'europe|south_america':          ['gibraltar', 'canary'],
+    'europe|africa':                 ['gibraltar', 'canary'],
+    'europe|middle_east':            ['gibraltar', 'suez_n', 'suez_s', 'aden', 'hormuz'],
+    'europe|oceania':                ['gibraltar', 'suez_n', 'suez_s', 'aden', 'colombo', 'malacca', 'singapore'],
+    'north_america_east|south_america': ['panama_atl', 'panama_pac'],
+    'north_america_west|south_america': ['panama_pac', 'panama_atl'],
+    'north_america_east|africa':     ['azores', 'canary'],
+    'north_america_west|east_asia':  ['hawaii', 'guam'],
+    'north_america_west|oceania':    ['hawaii'],
+    'middle_east|africa':            ['aden', 'cape'],
+    'middle_east|east_asia':         ['hormuz', 'colombo', 'malacca', 'singapore'],
+    'africa|south_america':          ['cape', 'canary'],
+  };
+
+  function computeSeaRoute(lat1, lng1, lat2, lng2) {
+    const r1 = classifyOceanRegion(lat1, lng1);
+    const r2 = classifyOceanRegion(lat2, lng2);
+    const key1 = `${r1}|${r2}`, key2 = `${r2}|${r1}`;
+
+    let chokeNames = SEA_CORRIDORS[key1] || SEA_CORRIDORS[key2] || [];
+    // If reversed key was used, reverse the chokepoints
+    if (!SEA_CORRIDORS[key1] && SEA_CORRIDORS[key2]) {
+      chokeNames = [...chokeNames].reverse();
+    }
+
+    const waypoints = [[lat1, lng1]];
+    chokeNames.forEach(name => {
+      const cp = SEA_CHOKEPOINTS[name];
+      if (cp) waypoints.push([cp.lat, cp.lng]);
+    });
+    waypoints.push([lat2, lng2]);
+
+    // Compute total distance (haversine sum)
+    let totalDist = 0;
+    for (let i = 1; i < waypoints.length; i++) {
+      totalDist += haversine(waypoints[i-1][0], waypoints[i-1][1], waypoints[i][0], waypoints[i][1]);
+    }
+
+    return { coords: waypoints, distance_km: Math.round(totalDist) };
+  }
+
+  /* ══════════════════════════════════════════════════
+     RAIL CORRIDOR ENGINE — Route through major rail hubs
+  ══════════════════════════════════════════════════ */
+  const RAIL_HUBS = {
+    // Asia
+    mumbai:    { lat: 19.0,  lng: 72.8 },
+    delhi:     { lat: 28.6,  lng: 77.2 },
+    kolkata:   { lat: 22.6,  lng: 88.4 },
+    dhaka:     { lat: 23.8,  lng: 90.4 },
+    kunming:   { lat: 25.0,  lng: 102.7 },
+    chengdu:   { lat: 30.6,  lng: 104.1 },
+    xian:      { lat: 34.3,  lng: 108.9 },
+    zhengzhou: { lat: 34.7,  lng: 113.7 },
+    shanghai:  { lat: 31.2,  lng: 121.5 },
+    beijing:   { lat: 39.9,  lng: 116.4 },
+    guangzhou: { lat: 23.1,  lng: 113.3 },
+    hanoi:     { lat: 21.0,  lng: 105.9 },
+    tokyo:     { lat: 35.7,  lng: 139.7 },
+    // Europe
+    moscow:    { lat: 55.8,  lng: 37.6 },
+    berlin:    { lat: 52.5,  lng: 13.4 },
+    warsaw:    { lat: 52.2,  lng: 21.0 },
+    rotterdam: { lat: 51.9,  lng: 4.5 },
+    paris:     { lat: 48.9,  lng: 2.3 },
+    london:    { lat: 51.5,  lng: -0.1 },
+    istanbul:  { lat: 41.0,  lng: 29.0 },
+    // Central Asia (Trans-Siberian / New Silk Road)
+    almaty:    { lat: 43.2,  lng: 76.9 },
+    novosibirsk:{ lat: 55.0, lng: 82.9 },
+    yekaterinburg:{ lat: 56.8, lng: 60.6 },
+    // Middle East
+    dubai:     { lat: 25.2,  lng: 55.3 },
+    tehran:    { lat: 35.7,  lng: 51.4 },
+    // Americas
+    new_york:  { lat: 40.7,  lng: -74.0 },
+    chicago:   { lat: 41.9,  lng: -87.6 },
+    los_angeles:{ lat: 34.0, lng: -118.2 },
+  };
+
+  // Rail corridors: predefined chains connecting regions via rail hubs
+  const RAIL_CORRIDORS = {
+    'south_asia|east_asia':  ['delhi', 'kolkata', 'kunming', 'chengdu', 'zhengzhou'],
+    'south_asia|europe':     ['delhi', 'almaty', 'novosibirsk', 'yekaterinburg', 'moscow', 'warsaw', 'berlin'],
+    'east_asia|europe':      ['beijing', 'novosibirsk', 'yekaterinburg', 'moscow', 'warsaw', 'berlin'],
+    'europe|middle_east':    ['istanbul', 'tehran'],
+    'south_asia|middle_east':['delhi', 'tehran', 'dubai'],
+    'north_america_east|north_america_west': ['chicago'],
+  };
+
+  function computeRailRoute(lat1, lng1, lat2, lng2) {
+    const r1 = classifyOceanRegion(lat1, lng1); // reuse region classifier
+    const r2 = classifyOceanRegion(lat2, lng2);
+    const key1 = `${r1}|${r2}`, key2 = `${r2}|${r1}`;
+
+    let hubNames = RAIL_CORRIDORS[key1] || RAIL_CORRIDORS[key2] || [];
+    if (!RAIL_CORRIDORS[key1] && RAIL_CORRIDORS[key2]) {
+      hubNames = [...hubNames].reverse();
+    }
+
+    const waypoints = [[lat1, lng1]];
+    hubNames.forEach(name => {
+      const h = RAIL_HUBS[name];
+      if (h) waypoints.push([h.lat, h.lng]);
+    });
+    waypoints.push([lat2, lng2]);
+
+    return waypoints;
+  }
+
+  /* ══════════════════════════════════════════════════
+     OPEN-METEO WEATHER CLIENT — Free, no key
+  ══════════════════════════════════════════════════ */
+  const WMO_WEATHER = {
+    0: { icon: '☀️', label: 'Clear Sky' },
+    1: { icon: '🌤️', label: 'Mainly Clear' },
+    2: { icon: '⛅', label: 'Partly Cloudy' },
+    3: { icon: '☁️', label: 'Overcast' },
+    45:{ icon: '🌫️', label: 'Foggy' },
+    48:{ icon: '🌫️', label: 'Depositing Fog' },
+    51:{ icon: '🌦️', label: 'Light Drizzle' },
+    53:{ icon: '🌦️', label: 'Drizzle' },
+    55:{ icon: '🌧️', label: 'Heavy Drizzle' },
+    61:{ icon: '🌧️', label: 'Light Rain' },
+    63:{ icon: '🌧️', label: 'Rain' },
+    65:{ icon: '🌧️', label: 'Heavy Rain' },
+    71:{ icon: '🌨️', label: 'Light Snow' },
+    73:{ icon: '🌨️', label: 'Snow' },
+    75:{ icon: '❄️', label: 'Heavy Snow' },
+    80:{ icon: '🌦️', label: 'Rain Showers' },
+    81:{ icon: '🌧️', label: 'Heavy Showers' },
+    82:{ icon: '⛈️', label: 'Violent Showers' },
+    95:{ icon: '⛈️', label: 'Thunderstorm' },
+    96:{ icon: '⛈️', label: 'Thunderstorm + Hail' },
+    99:{ icon: '⛈️', label: 'Severe Thunderstorm' },
+  };
+
+  async function fetchWeather(lat, lng) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      const data = await res.json();
+      const c = data.current;
+      const wmo = WMO_WEATHER[c.weather_code] || { icon: '🌡️', label: 'Unknown' };
+      return {
+        temp: Math.round(c.temperature_2m),
+        wind: Math.round(c.wind_speed_10m),
+        code: c.weather_code,
+        icon: wmo.icon,
+        label: wmo.label,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════
+     VEHICLE & REAL ROUTE SYSTEM
+  ══════════════════════════════════════════════════ */
+  const COLORS = { road: 0xf97316, rail: 0x8b5cf6, sea: 0x22d3ee };
+  const HEX_COLORS = { road: '#f97316', rail: '#8b5cf6', sea: '#22d3ee' };
+  const HEIGHTS = { road: 0.004, rail: 0.008, sea: 0.012 };
+  const SPEEDS = { road: .012, rail: .008, sea: .004 }; // Faster for demo
+  const MODE_VIS = { road: true, rail: true, sea: true };
+  let arcObjs = {}, particleObjs = {};
+  let activeTrackMode = 'road';
+
+  /* ── Emoji map per transport mode ── */
+  const MODE_EMOJI = { road: '🚛', rail: '🚂', sea: '🚢' };
+
+  /* ── Create vehicle marker as an emoji sprite ── */
+  function createVehicleMarker(colorHex, mode) {
+    const group = new THREE.Group();
+
+    // --- Emoji sprite via canvas texture ---
+    const size = 128;
+    const cvs = document.createElement('canvas');
+    cvs.width = size; cvs.height = size;
+    const ctx = cvs.getContext('2d');
+
+    // Soft circular glow behind the emoji
+    const grad = ctx.createRadialGradient(size/2, size/2, size*0.15, size/2, size/2, size*0.48);
+    const c = new THREE.Color(colorHex);
+    const rgbStr = `${Math.round(c.r*255)},${Math.round(c.g*255)},${Math.round(c.b*255)}`;
+    grad.addColorStop(0, `rgba(${rgbStr},0.55)`);
+    grad.addColorStop(0.6, `rgba(${rgbStr},0.18)`);
+    grad.addColorStop(1, `rgba(${rgbStr},0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(size/2, size/2, size*0.48, 0, Math.PI*2);
+    ctx.fill();
+
+    // Draw emoji
+    ctx.font = `${size * 0.52}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(MODE_EMOJI[mode] || '📦', size/2, size/2);
+
+    const tex = new THREE.CanvasTexture(cvs);
+    tex.needsUpdate = true;
+    const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, sizeAttenuation: true });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(0.07, 0.07, 1);
+    group.add(sprite);
+
+    // Outer pulsing ring for animation
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.028, 0.032, 24),
+      new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.45, side: THREE.DoubleSide })
+    );
+    group.add(ring);
+
+    group.userData = { ring, sprite };
+    return group;
+  }
+
+  /* ── Create trail dots along path ── */
+  function makeTrailDots(curve, color, count) {
+    const trailGroup = new THREE.Group();
+    for (let i = 0; i < count; i++) {
+      const dotGeo = new THREE.SphereGeometry(.003, 6, 6);
+      const dotMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .35 });
+      const dot = new THREE.Mesh(dotGeo, dotMat);
+      const t = i / (count - 1);
+      dot.position.copy(curve.getPoint(t));
+      trailGroup.add(dot);
+    }
+    return trailGroup;
+  }
+
+  function clearAllArcs() {
+    ['road', 'rail', 'sea'].forEach(m => {
+      if (arcObjs[m]) {
+        if (arcObjs[m].line) globeG.remove(arcObjs[m].line);
+        if (arcObjs[m].trail) globeG.remove(arcObjs[m].trail);
+        arcObjs[m] = null;
+      }
+      if (particleObjs[m]) { globeG.remove(particleObjs[m].marker); particleObjs[m] = null; }
+    });
+    // Hide live tracking
+    document.getElementById('live-tracking-chip').classList.remove('active');
+  }
+
+  /* ── Build route on globe from array of lat/lng coords ── */
+  function buildRealRoute(coords, mode) {
+    // Convert [lat,lng] array to Vector3 on globe surface
+    const height = HEIGHTS[mode];
+    const globePoints = coords.map(c => llV3(c[0], c[1], GLOBE_R + height));
+
+    // Create smooth curve through all points
+    const curve = new THREE.CatmullRomCurve3(globePoints, false, 'centripetal', 0.5);
+    const pts = curve.getPoints(Math.min(coords.length * 3, 500));
+
+    // Path line
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineDashedMaterial({
+      color: COLORS[mode],
+      transparent: true,
+      opacity: mode === 'sea' ? 0.5 : 0.65,
+      dashSize: mode === 'sea' ? 0.015 : 0.025,
+      gapSize: mode === 'sea' ? 0.01 : 0.008,
+    });
+    const line = new THREE.Line(geo, mat);
+    line.computeLineDistances();
+    line.visible = MODE_VIS[mode];
+    globeG.add(line);
+
+    // Trail dots
+    const trail = makeTrailDots(curve, COLORS[mode], 40);
+    trail.visible = MODE_VIS[mode];
+    globeG.add(trail);
+
+    arcObjs[mode] = { line, trail, curve, coords };
+
+    // Vehicle marker (AI-generated sprite)
+    const marker = createVehicleMarker(COLORS[mode], mode);
+    marker.visible = MODE_VIS[mode];
+    globeG.add(marker);
+    particleObjs[mode] = { marker, t: Math.random() * 0.3, speed: SPEEDS[mode] };
+  }
+
+  /* ── Fallback: build arc (old method) if API fails ── */
+  function buildFallbackArc(lat1, lng1, lat2, lng2, mode) {
+    const arcHeights = { road: 0.15, rail: 0.25, sea: 0.42 };
+    const s = llV3(lat1, lng1, GLOBE_R + .002), e = llV3(lat2, lng2, GLOBE_R + .002);
+    const ctrl = s.clone().add(e).normalize().multiplyScalar(GLOBE_R + arcHeights[mode]);
+    const curve = new THREE.QuadraticBezierCurve3(s, ctrl, e);
+    const pts = curve.getPoints(120);
+
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineDashedMaterial({
+      color: COLORS[mode], transparent: true, opacity: .25, dashSize: .02, gapSize: .015,
+    });
+    const line = new THREE.Line(geo, mat);
+    line.computeLineDistances();
+    line.visible = MODE_VIS[mode];
+    globeG.add(line);
+
+    const trail = makeTrailDots(curve, COLORS[mode], 30);
+    trail.visible = MODE_VIS[mode];
+    globeG.add(trail);
+
+    arcObjs[mode] = { line, trail, curve, coords: [[lat1, lng1], [lat2, lng2]] };
+
+    const marker = createVehicleMarker(COLORS[mode], mode);
+    marker.visible = MODE_VIS[mode];
+    globeG.add(marker);
+    particleObjs[mode] = { marker, t: Math.random(), speed: SPEEDS[mode] };
+  }
+
+  /* ── Mouse rotation ── */
+  let drag = false, prevXY = { x: 0, y: 0 };
+  let tgtX = 0.15, tgtY = 0, curX = 0.15, curY = 0;
+  let autoRotate = true;
+
+  canvas.addEventListener('mousedown', e => { drag = true; prevXY = { x: e.clientX, y: e.clientY }; autoRotate = false; });
+  canvas.addEventListener('mousemove', e => {
+    if (!drag) return;
+    tgtY += (e.clientX - prevXY.x) * .005;
+    tgtX += (e.clientY - prevXY.y) * .005;
+    tgtX = Math.max(-1.2, Math.min(1.2, tgtX));
+    prevXY = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener('mouseup', () => drag = false);
+  canvas.addEventListener('mouseleave', () => drag = false);
+  canvas.addEventListener('touchstart', e => { drag = true; prevXY = { x: e.touches[0].clientX, y: e.touches[0].clientY }; autoRotate = false; e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    if (!drag) return;
+    tgtY += (e.touches[0].clientX - prevXY.x) * .005;
+    tgtX += (e.touches[0].clientY - prevXY.y) * .005;
+    prevXY = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => drag = false);
+
+  /* ── Scroll to zoom ── */
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const zoomSpeed = 0.3;
+    tgtZ += e.deltaY > 0 ? zoomSpeed : -zoomSpeed;
+    tgtZ = Math.max(1.5, Math.min(8, tgtZ));
+    autoRotate = false;
+    // Show reset button when zoomed in
+    document.getElementById('reset-view-btn').style.display = tgtZ < 4.3 ? 'flex' : 'none';
+  }, { passive: false });
+
+  /* ── Render loop ── */
+  function animLoop() {
+    requestAnimationFrame(animLoop);
+    if (autoRotate) tgtY += .0006;
+    curX += (tgtX - curX) * .06;
+    curY += (tgtY - curY) * .04;
+    curZ += (tgtZ - curZ) * .04;
+    camera.position.z = curZ;
+    globeG.rotation.x = curX;
+    globeG.rotation.y = curY;
+
+    if (cloudMesh) cloudMesh.rotation.y += .0001;
+
+    const now = Date.now();
+    ['road', 'rail', 'sea'].forEach(m => {
+      const p = particleObjs[m];
+      if (!p || !p.marker.visible) return;
+      p.t += p.speed;
+      if (p.t > 1) p.t = 0;
+      const arc = arcObjs[m];
+      if (arc && arc.curve) {
+        const pt = arc.curve.getPoint(p.t);
+        p.marker.position.copy(pt);
+        const tangent = arc.curve.getTangent(p.t).normalize();
+        const normal = pt.clone().normalize();
+        p.marker.up.copy(normal);
+        p.marker.lookAt(pt.clone().add(tangent));
+      }
+      const s = 1 + 0.15 * Math.sin(now * 0.005 + m.length);
+      p.marker.scale.set(s, s, s);
+      // Animate ring
+      if (p.marker.userData && p.marker.userData.ring) {
+        const ring = p.marker.userData.ring;
+        ring.lookAt(camera.position);
+        ring.material.opacity = 0.3 + 0.25 * Math.sin(now * 0.004 + m.length);
+        ring.scale.setScalar(1 + 0.2 * Math.sin(now * 0.003));
+      }
+      // Keep sprite facing camera
+      if (p.marker.userData && p.marker.userData.sprite) {
+        p.marker.userData.sprite.material.opacity = 0.85 + 0.15 * Math.sin(now * 0.003);
+      }
+
+      // Update live tracking HUD for active mode
+      if (m === activeTrackMode && arc && arc.coords) {
+        const idx = Math.min(Math.floor(p.t * (arc.coords.length - 1)), arc.coords.length - 1);
+        const coord = arc.coords[idx];
+        if (coord) {
+          const liveEl = document.getElementById('live-tracking-chip');
+          if (liveEl.classList.contains('active')) {
+            document.getElementById('live-coords-txt').textContent =
+              `${coord[0].toFixed(4)}°, ${coord[1].toFixed(4)}° · ${Math.round(p.t * 100)}% transit`;
+          }
+        }
+      }
+    });
+    renderer.render(scene, camera);
+  }
+  animLoop();
+
+  /* ══════════════════════════════════════════════════
+     GEOCODING & TOGGLES
+  ══════════════════════════════════════════════════ */
+  document.getElementById('origin-input').addEventListener('input', () => liveGeocode('origin-input', 'origin-coords'));
+  document.getElementById('dest-input').addEventListener('input', () => liveGeocode('dest-input', 'dest-coords'));
+
+  let selOpt = 'balanced';
+  document.querySelectorAll('.opt-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.opt-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      selOpt = b.dataset.opt;
+    });
+  });
+
+  /* ══════════════════════════════════════════════════
+     MODE VISIBILITY
+  ══════════════════════════════════════════════════ */
+  function toggleMode(m) {
+    const el = document.getElementById('m-' + m);
+    el.classList.toggle('on');
+    const vis = el.classList.contains('on');
+    MODE_VIS[m] = vis;
+    if (arcObjs[m]) {
+      arcObjs[m].line.visible = vis;
+      if (arcObjs[m].trail) arcObjs[m].trail.visible = vis;
+    }
+    if (particleObjs[m] && particleObjs[m].marker) particleObjs[m].marker.visible = vis;
+  }
+
+  /* ══════════════════════════════════════════════════
+     SUBSAMPLE COORDINATES for globe performance
+  ══════════════════════════════════════════════════ */
+  function subsampleCoords(coords, maxPoints) {
+    if (coords.length <= maxPoints) return coords;
+    const step = (coords.length - 1) / (maxPoints - 1);
+    const result = [];
+    for (let i = 0; i < maxPoints; i++) {
+      result.push(coords[Math.round(i * step)]);
+    }
+    return result;
+  }
+
+  /* ══════════════════════════════════════════════════
+     INTERPOLATE SEA WAYPOINTS — add intermediate points for smooth curve
+  ══════════════════════════════════════════════════ */
+  function interpolateGreatCircle(lat1, lng1, lat2, lng2, numPoints) {
+    const pts = [];
+    const toRad = d => d * Math.PI / 180;
+    const toDeg = r => r * 180 / Math.PI;
+    const f1 = toRad(lat1), l1 = toRad(lng1);
+    const f2 = toRad(lat2), l2 = toRad(lng2);
+    const d = 2 * Math.asin(Math.sqrt(
+      Math.sin((f2-f1)/2)**2 + Math.cos(f1)*Math.cos(f2)*Math.sin((l2-l1)/2)**2
+    ));
+    if (d < 0.0001) return [[lat1, lng1], [lat2, lng2]];
+    for (let i = 0; i <= numPoints; i++) {
+      const frac = i / numPoints;
+      const A = Math.sin((1-frac)*d) / Math.sin(d);
+      const B = Math.sin(frac*d) / Math.sin(d);
+      const x = A*Math.cos(f1)*Math.cos(l1) + B*Math.cos(f2)*Math.cos(l2);
+      const y = A*Math.cos(f1)*Math.sin(l1) + B*Math.cos(f2)*Math.sin(l2);
+      const z = A*Math.sin(f1) + B*Math.sin(f2);
+      pts.push([toDeg(Math.atan2(z, Math.sqrt(x*x+y*y))), toDeg(Math.atan2(y, x))]);
+    }
+    return pts;
+  }
+
+  function densifySeaRoute(waypoints) {
+    // Add interpolated points between each waypoint pair for a smooth curve
+    const dense = [];
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const seg = interpolateGreatCircle(
+        waypoints[i][0], waypoints[i][1],
+        waypoints[i+1][0], waypoints[i+1][1],
+        12
+      );
+      if (i > 0) seg.shift(); // avoid duplicates
+      dense.push(...seg);
+    }
+    return dense;
+  }
+
+  /* ══════════════════════════════════════════════════
+     COMPUTE ROUTES — Orchestrates real API calls
+  ══════════════════════════════════════════════════ */
+  let curOrigin = null, curDest = null;
+  let routeDataSources = { road: 'mock', rail: 'mock', sea: 'waypoint' };
+  let weatherData = { origin: null, destination: null };
+
+  async function computeRoutes() {
+    const oEl = document.getElementById('origin-coords');
+    const dEl = document.getElementById('dest-coords');
+    const oLat = parseFloat(oEl.dataset.lat), oLng = parseFloat(oEl.dataset.lng);
+    const dLat = parseFloat(dEl.dataset.lat), dLng = parseFloat(dEl.dataset.lng);
+
+    if (!oLat || !dLat || isNaN(oLat) || isNaN(dLat)) {
+      showToast('⚠ Geocode both origin and destination first', '#f97316');
+      return;
+    }
+
+    curOrigin = { lat: oLat, lng: oLng };
+    curDest = { lat: dLat, lng: dLng };
+
+    const btn = document.getElementById('compute-btn');
+    btn.disabled = true;
+    document.getElementById('btn-label').textContent = 'Fetching live data…';
+    document.getElementById('btn-bar').style.width = '30%';
+
+    document.getElementById('results-body').innerHTML =
+      '<div class="loading-state"><div class="spinner"></div><span>Connecting to OSRM & Open-Meteo…</span></div>';
+
+    document.getElementById('route-chip').style.display = 'flex';
+    document.getElementById('route-chip-txt').textContent = 'Fetching routes…';
+    document.getElementById('status-txt').textContent = 'Querying APIs…';
+
+    const weight = parseFloat(document.getElementById('cargo-weight').value) || 20;
+    const straightDist = haversine(oLat, oLng, dLat, dLng);
+
+    // ─── Parallel API calls ─────────────────────
+    let roadResult = null, railResult = null, seaResult = null;
+    routeDataSources = { road: 'mock', rail: 'mock', sea: 'waypoint' };
+
+    document.getElementById('btn-bar').style.width = '50%';
+
+    // 1) ROAD — OSRM real road routing
+    try {
+      roadResult = await fetchOSRMRoute([[oLat, oLng], [dLat, dLng]]);
+      routeDataSources.road = 'osrm';
+    } catch {
+      // Fallback: mock road data
+      roadResult = {
+        coords: [[oLat, oLng], [dLat, dLng]],
+        distance_m: straightDist * 1320,
+        duration_s: (straightDist * 1.32 / 68) * 3600,
+      };
+    }
+
+    // 2) RAIL — OSRM through rail hub waypoints
+    try {
+      const railWaypoints = computeRailRoute(oLat, oLng, dLat, dLng);
+      railResult = await fetchOSRMRoute(railWaypoints);
+      routeDataSources.rail = 'osrm';
+    } catch {
+      const railWP = computeRailRoute(oLat, oLng, dLat, dLng);
+      let railDist = 0;
+      for (let i = 1; i < railWP.length; i++) {
+        railDist += haversine(railWP[i-1][0], railWP[i-1][1], railWP[i][0], railWP[i][1]);
+      }
+      railResult = {
+        coords: railWP,
+        distance_m: railDist * 1000,
+        duration_s: (railDist / 75) * 3600,
+      };
+    }
+
+    // 3) SEA — Maritime waypoint engine (always custom)
+    const seaRoute = computeSeaRoute(oLat, oLng, dLat, dLng);
+    const seaDenseCoords = densifySeaRoute(seaRoute.coords);
+    seaResult = {
+      coords: seaDenseCoords,
+      rawWaypoints: seaRoute.coords,
+      distance_m: seaRoute.distance_km * 1000,
+      duration_s: (seaRoute.distance_km / 18) * 3600,
+    };
+    routeDataSources.sea = 'waypoint';
+
+    document.getElementById('btn-bar').style.width = '70%';
+    document.getElementById('btn-label').textContent = 'Fetching weather…';
+
+    // 4) WEATHER — Open-Meteo at origin + destination
+    const [weatherO, weatherD] = await Promise.all([
+      fetchWeather(oLat, oLng),
+      fetchWeather(dLat, dLng),
+    ]);
+    weatherData = { origin: weatherO, destination: weatherD };
+
+    document.getElementById('btn-bar').style.width = '90%';
+
+    // ─── Build route data ───────────────────────
+    const road = {
+      mode: 'road',
+      dist_km: Math.round(roadResult.distance_m / 1000),
+      time_h: Math.round(roadResult.duration_s / 3600),
+      cost_usd: Math.round((roadResult.distance_m / 1000) * 2.15 * (weight / 20)),
+      co2_kg: Math.round((roadResult.distance_m / 1000) * 0.148 * weight / 20),
+      risk: 'Low',
+      speed_kmh: Math.round((roadResult.distance_m / 1000) / (roadResult.duration_s / 3600)) || 68,
+      source: routeDataSources.road,
+    };
+    const rail = {
+      mode: 'rail',
+      dist_km: Math.round(railResult.distance_m / 1000),
+      time_h: Math.round(railResult.duration_s / 3600),
+      cost_usd: Math.round((railResult.distance_m / 1000) * 1.35 * (weight / 20)),
+      co2_kg: Math.round((railResult.distance_m / 1000) * 0.04 * weight / 20),
+      risk: 'Low',
+      speed_kmh: 75,
+      source: routeDataSources.rail,
+    };
+    const sea = {
+      mode: 'sea',
+      dist_km: Math.round(seaResult.distance_m / 1000),
+      time_h: Math.round(seaResult.duration_s / 3600),
+      cost_usd: Math.round((seaResult.distance_m / 1000) * 0.55 * (weight / 20)),
+      co2_kg: Math.round((seaResult.distance_m / 1000) * 0.009 * weight / 20),
+      risk: 'Medium',
+      speed_kmh: 18,
+      source: routeDataSources.sea,
+    };
+
+    let rec = 'sea';
+    if (selOpt === 'time') rec = straightDist < 800 ? 'road' : 'rail';
+    else if (selOpt === 'cost') rec = straightDist > 600 ? 'sea' : 'road';
+
+    const origins = document.getElementById('origin-input').value;
+    const dests = document.getElementById('dest-input').value;
+
+    const insights = {
+      balanced: `Balanced analysis for ${origins} → ${dests} (${Math.round(straightDist)} km straight-line): Sea freight offers lowest cost for non-urgent cargo. Rail provides good speed-cost balance for inland routes. Road is best for last-mile flexibility. CO₂ advantage strongly favours sea (${sea.co2_kg} kg vs road's ${road.co2_kg} kg).`,
+      cost: `Cost-optimized for ${origins} → ${dests}: Sea freight at $${sea.cost_usd.toLocaleString()} is most economical — ${Math.round((1 - sea.cost_usd / road.cost_usd) * 100)}% cheaper than road. Consider bulk consolidation to further reduce per-unit costs.`,
+      time: `Time-optimized for ${origins} → ${dests}: ${straightDist < 800 ? 'Road is fastest for short hauls under 800 km.' : 'Rail cuts transit by ~20% vs road on this corridor.'} Disruption buffer of 15–20% recommended.`,
+    };
+
+    const sourceLabels = [];
+    if (routeDataSources.road === 'osrm') sourceLabels.push('OSRM (road)');
+    if (routeDataSources.rail === 'osrm') sourceLabels.push('OSRM (rail)');
+    sourceLabels.push('Maritime Waypoints (sea)');
+    if (weatherO || weatherD) sourceLabels.push('Open-Meteo (weather)');
+
+    const data = {
+      routes: [road, rail, sea],
+      rec,
+      insight: insights[selOpt],
+      total_km: Math.round(straightDist),
+      weatherOrigin: weatherO,
+      weatherDest: weatherD,
+      sources: sourceLabels,
+      logs: [
+        { t: 'API', cls: 'log-info', msg: `Geocoded: ${origins} ↔ ${dests}` },
+        { t: routeDataSources.road === 'osrm' ? 'OSRM' : 'MOCK', cls: 'log-ok', msg: `Road: ${road.dist_km.toLocaleString()} km via ${routeDataSources.road === 'osrm' ? 'OSRM real routing' : 'mock data'}` },
+        { t: routeDataSources.rail === 'osrm' ? 'OSRM' : 'MOCK', cls: 'log-ok', msg: `Rail: ${rail.dist_km.toLocaleString()} km via ${routeDataSources.rail === 'osrm' ? 'OSRM + rail hubs' : 'mock data'}` },
+        { t: 'SEA', cls: 'log-ok', msg: `Sea: ${sea.dist_km.toLocaleString()} km via maritime waypoint engine` },
+        { t: 'WEATHER', cls: weatherO ? 'log-ok' : 'log-warn', msg: weatherO ? `Origin: ${weatherO.icon} ${weatherO.temp}°C · Dest: ${weatherD ? weatherD.icon + ' ' + weatherD.temp + '°C' : 'N/A'}` : 'Weather unavailable' },
+        { t: 'AI', cls: 'log-ok', msg: `Recommendation: ${rec.toUpperCase()}` },
+      ],
+    };
+
+    // Store for cost page
+    localStorage.setItem('zerodelay_last_result', JSON.stringify({
+      ...data,
+      origin: origins, destination: dests, optimize: selOpt,
+      cargo: document.getElementById('cargo-type').value,
+      weight, oLat, oLng, dLat, dLng
+    }));
+
+    // ─── Build 3D Routes on Globe ───────────────
+    clearAllArcs();
+    setTimeout(() => {
+      // Road
+      if (routeDataSources.road === 'osrm' && roadResult.coords.length > 2) {
+        buildRealRoute(subsampleCoords(roadResult.coords, 200), 'road');
+      } else {
+        buildFallbackArc(oLat, oLng, dLat, dLng, 'road');
+      }
+
+      // Rail
+      if (railResult.coords.length > 2) {
+        buildRealRoute(subsampleCoords(railResult.coords, 200), 'rail');
+      } else {
+        buildFallbackArc(oLat, oLng, dLat, dLng, 'rail');
+      }
+
+      // Sea
+      buildRealRoute(seaDenseCoords, 'sea');
+
+      // Rotate globe to face the route (no zoom — user can scroll to zoom)
+      const midLat = (oLat + dLat) / 2, midLng = (oLng + dLng) / 2;
+      tgtY = -(midLng * Math.PI / 180) - Math.PI;
+      tgtX = -(midLat * Math.PI / 180) * .5;
+      autoRotate = false;
+      document.getElementById('reset-view-btn').style.display = 'flex';
+
+      // Show live tracking
+      activeTrackMode = rec;
+      const modeEmoji = { road: '🚛', rail: '🚂', sea: '🚢' };
+      document.getElementById('live-mode-txt').textContent = `${modeEmoji[rec]} ${rec} · LIVE`;
+      document.getElementById('live-tracking-chip').classList.add('active');
+    }, 200);
+
+    renderResults(data);
+    document.getElementById('route-chip-txt').textContent = `Optimal: ${rec.toUpperCase()}`;
+    document.getElementById('status-txt').textContent = 'Live Routes Active · Drag to Rotate';
+
+    // Auto-open the map after computation
+    if (!mapOpen) toggleMap();
+    updateLeafMap(roadResult, railResult, seaResult);
+
+    btn.disabled = false;
+    document.getElementById('btn-label').textContent = '⚡ Compute Routes';
+    document.getElementById('btn-bar').style.width = '0%';
+
+    const srcCount = (routeDataSources.road === 'osrm' ? 1 : 0) + (routeDataSources.rail === 'osrm' ? 1 : 0);
+    showToast(`✓ Routes computed · ${srcCount > 0 ? srcCount + ' OSRM' : 'Mock'} + Sea waypoints + Weather`, '#10b981');
+  }
+
+  /* ══════════════════════════════════════════════════
+     RENDER RESULTS — with weather, data source badges
+  ══════════════════════════════════════════════════ */
+  function renderResults(data) {
+    const { routes, rec, insight, total_km, logs, weatherOrigin, weatherDest, sources } = data;
+    const modeColor = { road: 'var(--road)', rail: 'var(--rail)', sea: 'var(--sea)' };
+    const modeEmoji = { road: '🚛', rail: '🚂', sea: '🚢' };
+    const maxCost = Math.max(...routes.map(r => r.cost_usd));
+
+    const sorted = [...routes].sort((a, b) => a.mode === rec ? -1 : b.mode === rec ? 1 : 0);
+
+    const cardsHTML = sorted.map(r => `
+      <div class="route-card ${r.mode} ${r.mode === rec ? 'best' : ''}" onclick="highlightArc('${r.mode}')">
+        <div class="rc-head">
+          <div class="rc-type" style="color:${modeColor[r.mode]}">
+            ${modeEmoji[r.mode]} ${r.mode.toUpperCase()}
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="source-badge ${r.source === 'osrm' ? 'osrm' : r.source === 'waypoint' ? 'osrm' : 'mock'}">${r.source === 'osrm' ? 'OSRM' : r.source === 'waypoint' ? 'MARITIME' : 'MOCK'}</span>
+            ${r.mode === rec ? '<span class="optimal-badge">OPTIMAL</span>' : ''}
+            <span class="live-badge"><span class="live-badge-dot"></span>LIVE</span>
+          </div>
+        </div>
+        <div class="rc-grid">
+          <div><div class="rc-stat-label">Distance</div><div class="rc-stat-value">${r.dist_km.toLocaleString()} km</div></div>
+          <div><div class="rc-stat-label">Est. Time</div><div class="rc-stat-value">${formatTime(r.time_h)}</div></div>
+          <div><div class="rc-stat-label">Est. Cost</div><div class="rc-stat-value">$${r.cost_usd.toLocaleString()}</div></div>
+          <div><div class="rc-stat-label">CO₂</div><div class="rc-stat-value">${r.co2_kg.toLocaleString()} kg</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Risk: ${r.risk || 'Low'}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.cost_usd / maxCost * 100)}%;background:${modeColor[r.mode]}"></div></div>
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">${Math.round(r.cost_usd / maxCost * 100)}%</div>
+        </div>
+      </div>`).join('');
+
+    // Weather card
+    const weatherHTML = (weatherOrigin || weatherDest) ? `
+      <div class="ai-card" style="border-color:rgba(167,139,250,.2)">
+        <div class="ai-card-header">
+          <div class="ai-orb">🌤️</div>
+          <div class="ai-card-title">Live Weather <span class="source-badge weather" style="margin-left:8px">OPEN-METEO</span></div>
+        </div>
+        <div class="ai-card-body" style="padding:0">
+          ${weatherOrigin ? `
+          <div class="weather-row">
+            <span class="weather-icon">${weatherOrigin.icon}</span>
+            <span style="flex:1"><strong>Origin:</strong> ${weatherOrigin.label}</span>
+            <span class="weather-temp">${weatherOrigin.temp}°C</span>
+            <span class="weather-wind">💨 ${weatherOrigin.wind} km/h</span>
+          </div>` : ''}
+          ${weatherDest ? `
+          <div class="weather-row">
+            <span class="weather-icon">${weatherDest.icon}</span>
+            <span style="flex:1"><strong>Dest:</strong> ${weatherDest.label}</span>
+            <span class="weather-temp">${weatherDest.temp}°C</span>
+            <span class="weather-wind">💨 ${weatherDest.wind} km/h</span>
+          </div>` : ''}
+        </div>
+      </div>` : '';
+
+    const logsHTML = (logs || []).map(l => `
+      <div class="log-line">
+        <span class="log-ts">${new Date().toLocaleTimeString('en', { hour12: false })}</span>
+        <span class="${l.cls}">[${l.t}]</span>
+        <span>${l.msg}</span>
+      </div>`).join('');
+
+    document.getElementById('results-body').innerHTML = `
+      <div style="font-size:10px;color:var(--muted);letter-spacing:2px">
+        STRAIGHT-LINE DISTANCE · ${total_km.toLocaleString()} km
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:-8px">
+        ${(sources || []).map(s => `<span class="source-badge ${s.includes('OSRM') ? 'osrm' : s.includes('Weather') ? 'weather' : 'osrm'}" style="font-size:8px">${s}</span>`).join('')}
+      </div>
+      ${cardsHTML}
+      ${weatherHTML}
+      <div class="ai-card">
+        <div class="ai-card-header">
+          <div class="ai-orb">🤖</div>
+          <div class="ai-card-title">AI Insight</div>
+        </div>
+        <div class="ai-card-body">${insight}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--cyan);margin-bottom:8px">System Log</div>
+        <div class="log-terminal">${logsHTML}</div>
+      </div>
+    `;
+  }
+
+  function highlightArc(mode) {
+    activeTrackMode = mode;
+    const modeEmoji = { road: '🚛', rail: '🚂', sea: '🚢' };
+    document.getElementById('live-mode-txt').textContent = `${modeEmoji[mode]} ${mode} · LIVE`;
+    document.getElementById('live-tracking-chip').classList.add('active');
+
+    ['road', 'rail', 'sea'].forEach(m => {
+      if (arcObjs[m]) arcObjs[m].line.material.opacity = m === mode ? 1.0 : .15;
+      if (particleObjs[m] && particleObjs[m].marker) particleObjs[m].marker.visible = m === mode;
+    });
+    setTimeout(() => {
+      ['road', 'rail', 'sea'].forEach(m => {
+        if (arcObjs[m]) arcObjs[m].line.material.opacity = MODE_VIS[m] ? .65 : 0;
+        if (particleObjs[m] && particleObjs[m].marker) particleObjs[m].marker.visible = MODE_VIS[m];
+      });
+    }, 3000);
+  }
+
+  /* ══════════════════════════════════════════════════
+     LEAFLET MAP — Real polylines
+  ══════════════════════════════════════════════════ */
+  let leafMap = null, leafLayers = [];
+
+  function initLeafMap() {
+    if (leafMap) return;
+    leafMap = L.map('leaflet-map', { zoomControl: true }).setView([20, 80], 3);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '©OpenStreetMap ©CartoDB',
+      subdomains: 'abcd', maxZoom: 19
+    }).addTo(leafMap);
+  }
+
+  function updateLeafMap(roadResult, railResult, seaResult) {
+    if (!leafMap) initLeafMap();
+    leafLayers.forEach(l => l.remove());
+    leafLayers = [];
+    const mColors = { road: '#f97316', rail: '#8b5cf6', sea: '#22d3ee' };
+
+    // Draw real polylines
+    if (MODE_VIS.road && roadResult && roadResult.coords.length > 1) {
+      const rl = L.polyline(roadResult.coords, { color: mColors.road, weight: 3, opacity: .85 }).addTo(leafMap);
+      leafLayers.push(rl);
+    }
+    if (MODE_VIS.rail && railResult && railResult.coords.length > 1) {
+      const rl = L.polyline(railResult.coords, { color: mColors.rail, weight: 2.5, opacity: .8, dashArray: '8,4' }).addTo(leafMap);
+      leafLayers.push(rl);
+    }
+    if (MODE_VIS.sea && seaResult && seaResult.rawWaypoints) {
+      // Draw through all dense points for smooth line
+      const coords = seaResult.coords || seaResult.rawWaypoints;
+      const rl = L.polyline(coords, { color: mColors.sea, weight: 2, opacity: .7, dashArray: '4,8' }).addTo(leafMap);
+      leafLayers.push(rl);
+
+      // Mark sea chokepoints
+      (seaResult.rawWaypoints || []).forEach((wp, i) => {
+        if (i === 0 || i === seaResult.rawWaypoints.length - 1) return;
+        const cm = L.circleMarker(wp, { radius: 4, color: '#22d3ee', fillColor: '#22d3ee', fillOpacity: .6, weight: 1 })
+          .bindTooltip('Waypoint', { permanent: false }).addTo(leafMap);
+        leafLayers.push(cm);
+      });
+    }
+
+    // Origin/Destination markers
+    if (curOrigin && curDest) {
+      const oMark = L.circleMarker([curOrigin.lat, curOrigin.lng], { radius: 8, color: '#00e5ff', fillColor: '#00e5ff', fillOpacity: .9, weight: 2 })
+        .bindTooltip('📍 Origin', { permanent: false }).addTo(leafMap);
+      const dMark = L.circleMarker([curDest.lat, curDest.lng], { radius: 8, color: '#f97316', fillColor: '#f97316', fillOpacity: .9, weight: 2 })
+        .bindTooltip('📍 Destination', { permanent: false }).addTo(leafMap);
+      leafLayers.push(oMark, dMark);
+      leafMap.fitBounds(L.latLngBounds([[curOrigin.lat, curOrigin.lng], [curDest.lat, curDest.lng]]).pad(.3));
+    }
+  }
+
+  // Store route results for map toggle
+  let lastRoadResult = null, lastRailResult = null, lastSeaResult = null;
+
+  // Override computeRoutes to store results
+  const _origComputeRoutes = computeRoutes;
+
+  let mapOpen = false;
+  function toggleMap() {
+    mapOpen = !mapOpen;
+    document.getElementById('map-panel').classList.toggle('open', mapOpen);
+    document.getElementById('map-btn-txt').textContent = mapOpen ? 'Hide Map' : 'Show Map';
+    if (mapOpen) {
+      if (!leafMap) initLeafMap();
+      setTimeout(() => leafMap && leafMap.invalidateSize(), 50);
+    }
+  }
+
+  /* ── Reset View (zoom back to full globe) ── */
+  function resetView() {
+    tgtZ = 4.5;
+    tgtX = 0.15;
+    autoRotate = true;
+    document.getElementById('reset-view-btn').style.display = 'none';
+  }
+  </script>
+</body>
+</html>

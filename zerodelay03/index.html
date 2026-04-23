@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZeroDelay · Smart Supply Chain Optimizer</title>
+  <meta name="description" content="AI-powered supply chain optimization platform with multi-modal route generation, real-time cost analysis, and intelligent disruption insights." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ─── Navigation ──────────────────────────────── -->
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M2 17L12 22L22 17" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/>
+            <defs><linearGradient id="g1" x1="2" y1="2" x2="22" y2="22"><stop stop-color="#00e5ff"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">ZERODELAY</div>
+          <div class="brand-sub">Smart Supply Chain</div>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link active">Dashboard</a>
+        <a href="routes.html" class="nav-link">Route Planner</a>
+        <a href="cost.html" class="nav-link">Cost Analysis</a>
+        <a href="ai-insights.html" class="nav-link">AI Insights</a>
+      </div>
+      <div class="nav-status">
+        <div class="status-dot"></div>
+        <span>System Online</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ─── Hero Section ────────────────────────────── -->
+  <section id="hero">
+    <div class="hero-bg-grid"></div>
+    <div class="hero-glow hero-glow-1"></div>
+    <div class="hero-glow hero-glow-2"></div>
+    
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="badge-dot"></span>
+        AI-Powered Logistics Intelligence
+      </div>
+      <h1 class="hero-title">
+        Optimize Your <br/>
+        <span class="gradient-text">Supply Chain</span> <br/>
+        With Zero Delay
+      </h1>
+      <p class="hero-subtitle">
+        Multi-modal route generation, real-time cost breakdown, intelligent disruption
+        analysis, and anomaly detection — all powered by advanced AI.
+      </p>
+      <div class="hero-actions">
+        <a href="routes.html" class="btn-primary" id="hero-cta">
+          <span>Launch Route Planner</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a href="ai-insights.html" class="btn-ghost" id="hero-secondary">
+          <span>Explore AI Features</span>
+        </a>
+      </div>
+
+      <!-- Live Stats Bar -->
+      <div class="hero-stats" id="hero-stats">
+        <div class="stat-card" data-delay="0">
+          <div class="stat-value" id="stat-routes">0</div>
+          <div class="stat-label">Routes Optimized</div>
+        </div>
+        <div class="stat-card" data-delay="100">
+          <div class="stat-value" id="stat-cost">$0</div>
+          <div class="stat-label">Cost Saved</div>
+        </div>
+        <div class="stat-card" data-delay="200">
+          <div class="stat-value" id="stat-time">0h</div>
+          <div class="stat-label">Time Reduced</div>
+        </div>
+        <div class="stat-card" data-delay="300">
+          <div class="stat-value" id="stat-co2">0kg</div>
+          <div class="stat-label">CO₂ Prevented</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Features Section ────────────────────────── -->
+  <section id="features">
+    <div class="section-container">
+      <div class="section-header">
+        <div class="section-badge">Core Capabilities</div>
+        <h2 class="section-title">Everything You Need to <span class="gradient-text">Optimize Logistics</span></h2>
+        <p class="section-subtitle">From intelligent route planning to AI-driven anomaly detection, ZeroDelay covers every aspect of modern supply chain management.</p>
+      </div>
+
+      <div class="features-grid">
+        <!-- Feature 1: Route Generation -->
+        <a href="routes.html" class="feature-card" id="feat-route">
+          <div class="fc-icon fc-icon-route">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="6" r="3"/><circle cx="19" cy="18" r="3"/><path d="M8 6h4a4 4 0 0 1 4 4v0a4 4 0 0 1-4 4H8a4 4 0 0 0-4 4v0"/></svg>
+          </div>
+          <h3 class="fc-title">Route Generation</h3>
+          <p class="fc-desc">Multi-modal routing across Road, Rail, and Sea with real-time distance calculation and path visualization on an interactive 3D globe.</p>
+          <div class="fc-tags">
+            <span class="tag tag-road">🚛 Road</span>
+            <span class="tag tag-rail">🚂 Rail</span>
+            <span class="tag tag-sea">🚢 Sea</span>
+          </div>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <!-- Feature 2: Cost Calculation -->
+        <a href="cost.html" class="feature-card" id="feat-cost">
+          <div class="fc-icon fc-icon-cost">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <h3 class="fc-title">Cost Calculation</h3>
+          <p class="fc-desc">Comprehensive cost breakdown including distance-based charges, fuel surcharges, toll fees, taxes, and port handling fees per transport mode.</p>
+          <div class="fc-tags">
+            <span class="tag tag-fuel">⛽ Fuel</span>
+            <span class="tag tag-toll">🛣 Tolls</span>
+            <span class="tag tag-tax">📋 Tax</span>
+          </div>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <!-- Feature 3: Time Estimation -->
+        <a href="routes.html" class="feature-card" id="feat-time">
+          <div class="fc-icon fc-icon-time">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <h3 class="fc-title">Time Estimation</h3>
+          <p class="fc-desc">Accurate transit time predictions factoring in average speeds, traffic patterns, port delays, customs processing, and seasonal disruptions.</p>
+          <div class="fc-tags">
+            <span class="tag tag-speed">⚡ Speed</span>
+            <span class="tag tag-delay">⏱ Delays</span>
+          </div>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <!-- Feature 4: Decision Engine -->
+        <a href="cost.html" class="feature-card" id="feat-decide">
+          <div class="fc-icon fc-icon-decide">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v18M3 12h18"/><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </div>
+          <h3 class="fc-title">Decision Engine</h3>
+          <p class="fc-desc">Intelligent trade-off analysis between cost optimization and time optimization, with weighted scoring and clear recommendations.</p>
+          <div class="fc-tags">
+            <span class="tag tag-cost-opt">💰 Cost Opt.</span>
+            <span class="tag tag-time-opt">🕐 Time Opt.</span>
+          </div>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <!-- Feature 5: Route Explanation (AI) -->
+        <a href="ai-insights.html" class="feature-card fc-ai" id="feat-explain">
+          <div class="fc-icon fc-icon-ai">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a4 4 0 0 0-4 4v1H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h1v3a4 4 0 0 0 8 0v-3h1a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg>
+          </div>
+          <div class="fc-ai-badge">AI Powered</div>
+          <h3 class="fc-title">Route Explanation</h3>
+          <p class="fc-desc">LLM-powered natural language explanations of why specific routes are recommended, factoring in all optimization parameters.</p>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <!-- Feature 6: Disruption Insights (AI) -->
+        <a href="ai-insights.html" class="feature-card fc-ai" id="feat-disrupt">
+          <div class="fc-icon fc-icon-ai2">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="fc-ai-badge">AI Powered</div>
+          <h3 class="fc-title">Disruption Insights</h3>
+          <p class="fc-desc">Real-time analysis of weather events, port congestion, geopolitical risks, and seasonal delays that may impact your supply chain routes.</p>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <!-- Feature 7: Anomaly Detection (AI) -->
+        <a href="ai-insights.html" class="feature-card fc-ai" id="feat-anomaly">
+          <div class="fc-icon fc-icon-ai3">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div class="fc-ai-badge">AI Powered</div>
+          <h3 class="fc-title">Anomaly Detection</h3>
+          <p class="fc-desc">Automatic detection of inefficient routes, unusual cost spikes, and deviation from optimal paths — with corrective recommendations.</p>
+          <div class="fc-arrow">→</div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── How It Works ────────────────────────────── -->
+  <section id="how-it-works">
+    <div class="section-container">
+      <div class="section-header">
+        <div class="section-badge">Workflow</div>
+        <h2 class="section-title">How <span class="gradient-text">ZeroDelay</span> Works</h2>
+      </div>
+
+      <div class="steps-track">
+        <div class="step-line"></div>
+        <div class="step" data-step="1">
+          <div class="step-num">01</div>
+          <div class="step-content">
+            <h3>Configure Route</h3>
+            <p>Enter origin, destination, cargo type, and optimization preference (cost, time, or balanced).</p>
+          </div>
+        </div>
+        <div class="step" data-step="2">
+          <div class="step-num">02</div>
+          <div class="step-content">
+            <h3>Compute Routes</h3>
+            <p>The engine generates multi-modal routes (Road, Rail, Sea) with distance, cost, and time estimates.</p>
+          </div>
+        </div>
+        <div class="step" data-step="3">
+          <div class="step-num">03</div>
+          <div class="step-content">
+            <h3>AI Analysis</h3>
+            <p>LLM-powered insights explain route choices, flag disruptions, and detect anomalies in real-time.</p>
+          </div>
+        </div>
+        <div class="step" data-step="4">
+          <div class="step-num">04</div>
+          <div class="step-content">
+            <h3>Decision & Deploy</h3>
+            <p>Review the decision engine's recommendation, compare trade-offs, and finalize the optimal route.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Tech Stack Section ──────────────────────── -->
+  <section id="tech-stack">
+    <div class="section-container">
+      <div class="section-header">
+        <div class="section-badge">Architecture</div>
+        <h2 class="section-title">Built With <span class="gradient-text">Modern Stack</span></h2>
+      </div>
+      <div class="tech-grid">
+        <div class="tech-item">
+          <div class="tech-icon">🌐</div>
+          <div class="tech-name">HTML / CSS / JS</div>
+          <div class="tech-role">Frontend UI</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon">🐍</div>
+          <div class="tech-name">Flask</div>
+          <div class="tech-role">Backend API</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon">🤖</div>
+          <div class="tech-name">LLM APIs</div>
+          <div class="tech-role">AI Intelligence</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon">🗺️</div>
+          <div class="tech-name">Leaflet + Three.js</div>
+          <div class="tech-role">Map & Globe Viz</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon">📡</div>
+          <div class="tech-name">REST APIs</div>
+          <div class="tech-role">Data Exchange</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-icon">📊</div>
+          <div class="tech-name">Chart.js</div>
+          <div class="tech-role">Data Visualization</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Footer ──────────────────────────────────── -->
+  <footer id="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="brand-name" style="font-size:16px;">ZERODELAY</div>
+        <p style="color:var(--muted);font-size:12px;margin-top:6px;">Smart Supply Chain Optimizer</p>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Dashboard</a>
+        <a href="routes.html">Route Planner</a>
+        <a href="cost.html">Cost Analysis</a>
+        <a href="ai-insights.html">AI Insights</a>
+      </div>
+      <div class="footer-copy">
+        © 2026 ZeroDelay · Built for Intelligent Logistics
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>

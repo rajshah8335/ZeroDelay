@@ -1,0 +1,112 @@
+{
+  "nodes": [
+    {
+      "id": "pune",
+      "name": "Pune",
+      "type": "city",
+      "lat": 18.5204,
+      "lng": 73.8567,
+      "has_rail_terminal": true,
+      "has_port": false
+    },
+    {
+      "id": "mumbai",
+      "name": "Mumbai",
+      "type": "city",
+      "lat": 19.076,
+      "lng": 72.8777,
+      "has_rail_terminal": true,
+      "has_port": true
+    },
+    {
+      "id": "chennai",
+      "name": "Chennai",
+      "type": "city",
+      "lat": 13.0827,
+      "lng": 80.2707,
+      "has_rail_terminal": true,
+      "has_port": true
+    },
+    {
+      "id": "delhi",
+      "name": "Delhi",
+      "type": "city",
+      "lat": 28.7041,
+      "lng": 77.1025,
+      "has_rail_terminal": true,
+      "has_port": false
+    },
+    {
+      "id": "bangalore",
+      "name": "Bangalore",
+      "type": "city",
+      "lat": 12.9716,
+      "lng": 77.5946,
+      "has_rail_terminal": true,
+      "has_port": false
+    },
+    {
+      "id": "kolkata",
+      "name": "Kolkata",
+      "type": "city",
+      "lat": 22.5726,
+      "lng": 88.3639,
+      "has_rail_terminal": true,
+      "has_port": true
+    },
+    {
+      "id": "hyderabad",
+      "name": "Hyderabad",
+      "type": "city",
+      "lat": 17.385,
+      "lng": 78.4867,
+      "has_rail_terminal": true,
+      "has_port": false
+    },
+    {
+      "id": "ahmedabad",
+      "name": "Ahmedabad",
+      "type": "city",
+      "lat": 23.0225,
+      "lng": 72.5714,
+      "has_rail_terminal": true,
+      "has_port": false
+    },
+    {
+      "id": "jaipur",
+      "name": "Jaipur",
+      "type": "city",
+      "lat": 26.9124,
+      "lng": 75.7873,
+      "has_rail_terminal": true,
+      "has_port": false
+    },
+    {
+      "id": "cochin",
+      "name": "Cochin",
+      "type": "city",
+      "lat": 9.9312,
+      "lng": 76.2673,
+      "has_rail_terminal": true,
+      "has_port": true
+    },
+    {
+      "id": "vizag",
+      "name": "Visakhapatnam",
+      "type": "city",
+      "lat": 17.6868,
+      "lng": 83.2185,
+      "has_rail_terminal": true,
+      "has_port": true
+    },
+    {
+      "id": "goa",
+      "name": "Goa",
+      "type": "city",
+      "lat": 15.2993,
+      "lng": 74.124,
+      "has_rail_terminal": true,
+      "has_port": true
+    }
+  ]
+}

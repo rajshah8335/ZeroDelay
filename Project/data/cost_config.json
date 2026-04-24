@@ -28,5 +28,15 @@
     "speed_kmph": 25,
     "delay_hours": 24.0,
     "description": "Coastal shipping via major Indian ports"
+  },
+  "air": {
+    "rate_per_kg_km": 0.015,
+    "airport_handling_charge": 8000.0,
+    "customs_clearance": 5000.0,
+    "fuel_surcharge_percent": 15.0,
+    "insurance_percent": 1.0,
+    "speed_kmph": 800,
+    "delay_hours": 8.0,
+    "description": "International air freight via major cargo hubs"
   }
 }

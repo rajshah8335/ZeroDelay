@@ -36,6 +36,8 @@ def calculate_cost(route: dict, weight_kg: float, cost_config: dict) -> dict:
             cost = _calculate_rail_cost(distance, weight_kg, config)
         elif mode == "sea":
             cost = _calculate_sea_cost(distance, weight_kg, config)
+        elif mode == "air":
+            cost = _calculate_air_cost(distance, weight_kg, config)
         else:
             cost = {"total": 0, "breakdown": {}}
 
@@ -127,6 +129,31 @@ def _calculate_sea_cost(distance_km: float, weight_kg: float, config: dict) -> d
             "base_freight": round(base_freight, 2),
             "port_handling": round(port_handling, 2),
             "customs_clearance": customs,
+            "insurance": round(insurance, 2),
+        }
+    }
+
+
+def _calculate_air_cost(distance_km: float, weight_kg: float, config: dict) -> dict:
+    """
+    Air cost = weight × distance × rate + airport_handling + customs + fuel_surcharge + insurance.
+    """
+    base_freight = weight_kg * distance_km * config["rate_per_kg_km"]
+    handling = config["airport_handling_charge"]
+    customs = config["customs_clearance"]
+    fuel_surcharge = base_freight * (config["fuel_surcharge_percent"] / 100)
+
+    subtotal = base_freight + handling + customs + fuel_surcharge
+    insurance = subtotal * (config["insurance_percent"] / 100)
+    total = subtotal + insurance
+
+    return {
+        "total": round(total, 2),
+        "breakdown": {
+            "base_freight": round(base_freight, 2),
+            "airport_handling": handling,
+            "customs_clearance": customs,
+            "fuel_surcharge": round(fuel_surcharge, 2),
             "insurance": round(insurance, 2),
         }
     }

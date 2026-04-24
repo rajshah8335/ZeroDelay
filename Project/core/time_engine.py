@@ -1,8 +1,13 @@
 """
 Time Engine — calculates the total transit time for each route.
 
-Time formula per segment:
-  time = distance / speed + mode_delay
+For live API routes:
+  - Road: Uses real driving time from OpenRouteService (if available in segment)
+  - Rail: Uses estimated duration from maps_service
+  - Sea:  Uses estimated duration from route_engine
+
+For static fallback routes:
+  - time = distance / speed + mode_delay
 
 Disruptions multiply the base time by a delay_multiplier.
 
@@ -13,6 +18,9 @@ All logic is pure computation — no external API calls.
 def calculate_time(route: dict, cost_config: dict, disruptions: list = None) -> dict:
     """
     Calculate total transit time for a given route.
+
+    Supports both live API segments (with pre-calculated duration_hours)
+    and static segments (calculated from distance/speed).
 
     Args:
         route: route dict with segments from route_engine
@@ -33,11 +41,15 @@ def calculate_time(route: dict, cost_config: dict, disruptions: list = None) -> 
         distance = segment["distance_km"]
         config = cost_config[mode]
 
-        # Base transit time
-        speed = config["speed_kmph"]
-        travel_hours = distance / speed if speed > 0 else 0
+        # Check if real duration was already computed by the API
+        if "duration_hours" in segment and segment["duration_hours"]:
+            travel_hours = segment["duration_hours"]
+        else:
+            # Fallback: calculate from distance and speed
+            speed = config["speed_kmph"]
+            travel_hours = distance / speed if speed > 0 else 0
 
-        # Base delay (loading, customs, etc.)
+        # Base delay (loading, customs, terminal handling, etc.)
         base_delay = config["delay_hours"]
 
         # Check for disruptions on this segment
@@ -58,6 +70,7 @@ def calculate_time(route: dict, cost_config: dict, disruptions: list = None) -> 
             "delay_hours": base_delay,
             "disruption_multiplier": disruption_multiplier,
             "total_hours": round(total_segment_hours, 2),
+            "uses_real_time": "duration_hours" in segment,
         })
         total_hours += total_segment_hours
 
@@ -72,15 +85,22 @@ def _get_disruption_multiplier(from_city: str, to_city: str, mode: str, disrupti
     """
     Check if any active disruption affects this segment.
     Returns the worst-case delay multiplier (highest if multiple match).
+
+    For worldwide cities, disruptions are matched case-insensitively
+    and with underscored key format.
     """
     max_multiplier = 1.0
-    route_key1 = f"{from_city}_{to_city}"
-    route_key2 = f"{to_city}_{from_city}"
+
+    # Normalize city names for matching (lowercase, spaces → underscores)
+    from_norm = from_city.lower().replace(" ", "_")
+    to_norm = to_city.lower().replace(" ", "_")
+    route_key1 = f"{from_norm}_{to_norm}"
+    route_key2 = f"{to_norm}_{from_norm}"
 
     for d in disruptions:
         if d["mode"] != mode:
             continue
-        affected = d["affected_route"]
+        affected = d["affected_route"].lower()
         if affected in (route_key1, route_key2):
             max_multiplier = max(max_multiplier, d.get("delay_multiplier", 1.0))
 

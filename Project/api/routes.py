@@ -15,6 +15,7 @@ from core.time_engine import calculate_time
 from core.decision_engine import select_best_route
 from services.ai_service import generate_explanation
 from services.disruption_service import get_active_disruptions
+from services.maps_service import geocode_city
 import config
 
 
@@ -24,26 +25,16 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 @api_bp.route("/routes", methods=["GET", "POST"], strict_slashes=False)
 def optimize_routes():
-    if request.method == "GET":
-        return jsonify({
-            "message": "Optimization endpoint is active. Please use POST with a JSON body to calculate routes.",
-            "sample_payload": {
-                "source": "Pune",
-                "destination": "Chennai",
-                "weight": 1000,
-                "priority": 0.7
-            }
-        }), 200
     """
     POST /api/routes
 
     Accepts shipment details and returns optimized route options
-    with AI-generated insights.
+    with AI-generated insights. Supports ANY city worldwide.
 
     Request body:
         {
-            "source": "Pune",
-            "destination": "Chennai",
+            "source": "London",
+            "destination": "New York",
             "weight": 1000,
             "priority": 0.7
         }
@@ -55,6 +46,19 @@ def optimize_routes():
             "ai_insight": "..."
         }
     """
+    # Handle GET requests with usage info
+    if request.method == "GET":
+        return jsonify({
+            "message": "Optimization endpoint is active. Use POST with a JSON body.",
+            "sample_payload": {
+                "source": "London",
+                "destination": "Tokyo",
+                "weight": 1000,
+                "priority": 0.7
+            },
+            "notes": "Supports ANY city worldwide. Priority: 0=cost-first, 1=time-first."
+        }), 200
+
     # ---- Step 1: Validate input ----
     data = request.get_json(silent=True)
     cleaned, error = validate_route_request(data)
@@ -66,7 +70,20 @@ def optimize_routes():
     weight = cleaned["weight"]
     priority = cleaned["priority"]
 
-    # ---- Step 2: Load data ----
+    # ---- Step 2: Geocode cities ----
+    source_coords = geocode_city(source)
+    if not source_coords:
+        return jsonify({
+            "error": f"Could not find location: '{source}'. Try a more specific name (e.g., 'Mumbai, India')."
+        }), 400
+
+    dest_coords = geocode_city(destination)
+    if not dest_coords:
+        return jsonify({
+            "error": f"Could not find location: '{destination}'. Try a more specific name (e.g., 'London, UK')."
+        }), 400
+
+    # ---- Step 3: Load fallback data & disruptions ----
     try:
         nodes = load_nodes(config.NODES_FILE)
         routes_data = load_routes(config.ROUTES_FILE)
@@ -75,14 +92,23 @@ def optimize_routes():
     except FileNotFoundError as e:
         return jsonify({"error": f"Data loading failed: {str(e)}"}), 500
 
-    # ---- Step 3: Generate route options ----
-    routes = generate_routes(source, destination, routes_data, nodes)
+    # ---- Step 4: Generate route options (live API + fallback) ----
+    routes = generate_routes(
+        source=source,
+        destination=destination,
+        source_coords=source_coords,
+        dest_coords=dest_coords,
+        routes_data=routes_data,
+        nodes=nodes,
+    )
+
     if not routes:
         return jsonify({
-            "error": f"No routes found between {source} and {destination}"
+            "error": f"No routes found between {source} and {destination}. "
+                     "This may happen if both cities are landlocked with no road connection."
         }), 404
 
-    # ---- Step 4: Calculate cost & time for each route ----
+    # ---- Step 5: Calculate cost & time for each route ----
     route_analyses = []
     for route in routes:
         cost_result = calculate_cost(route, weight, cost_config)
@@ -93,11 +119,11 @@ def optimize_routes():
             "time": time_result,
         })
 
-    # ---- Step 5: Select best route via weighted scoring ----
+    # ---- Step 6: Select best route via weighted scoring ----
     ranked_routes = select_best_route(route_analyses, priority)
     best_route = ranked_routes[0] if ranked_routes else None
 
-    # ---- Step 6: Generate AI explanation ----
+    # ---- Step 7: Generate AI explanation ----
     ai_context = {
         "source": source,
         "destination": destination,
@@ -108,7 +134,7 @@ def optimize_routes():
     }
     ai_insight = generate_explanation(ai_context)
 
-    # ---- Step 7: Build response ----
+    # ---- Step 8: Build response ----
     response = {
         "request": {
             "source": source,
@@ -116,6 +142,14 @@ def optimize_routes():
             "weight_kg": weight,
             "priority": priority,
             "priority_description": _priority_label(priority),
+        },
+        "geocoded": {
+            "source": {
+                "coordinates": source_coords,
+            },
+            "destination": {
+                "coordinates": dest_coords,
+            },
         },
         "routes": _format_routes(ranked_routes),
         "best_route": _format_best_route(best_route),
@@ -126,19 +160,51 @@ def optimize_routes():
     return jsonify(response), 200
 
 
+@api_bp.route("/geocode", methods=["GET"], strict_slashes=False)
+def geocode():
+    """
+    GET /api/geocode?city=London
+
+    Geocode any city name to lat/lng coordinates.
+    Useful for verifying that a city name will work with the optimizer.
+    """
+    city = request.args.get("city", "").strip()
+    if not city:
+        return jsonify({"error": "Query parameter 'city' is required"}), 400
+
+    coords = geocode_city(city)
+    if not coords:
+        return jsonify({"error": f"Could not find location: '{city}'"}), 404
+
+    return jsonify({
+        "city": city,
+        "coordinates": coords,
+    }), 200
+
+
 @api_bp.route("/health", methods=["GET"])
 def health_check():
     """GET /api/health — simple health check endpoint."""
+    from services.maps_service import _ors_client
+
     return jsonify({
         "status": "healthy",
         "service": "Smart Supply Chain Optimizer",
-        "version": "1.0.0",
+        "version": "2.0.0",
+        "capabilities": {
+            "worldwide_routing": True,
+            "openrouteservice": _ors_client is not None,
+            "searoute": True,
+            "air_freight": True,
+            "geocoding": True,
+            "gemini_ai": bool(config.GEMINI_API_KEY),
+        }
     }), 200
 
 
 @api_bp.route("/cities", methods=["GET"])
 def list_cities():
-    """GET /api/cities — list all supported cities."""
+    """GET /api/cities — list pre-configured cities (fallback data)."""
     try:
         nodes = load_nodes(config.NODES_FILE)
         cities = [
@@ -150,7 +216,10 @@ def list_cities():
             }
             for n in nodes
         ]
-        return jsonify({"cities": cities}), 200
+        return jsonify({
+            "note": "These are pre-configured Indian cities. The optimizer now supports ANY city worldwide via geocoding.",
+            "cities": cities,
+        }), 200
     except FileNotFoundError:
         return jsonify({"error": "Node data not found"}), 500
 
@@ -177,6 +246,7 @@ def _format_routes(ranked_routes: list) -> list:
             "type": r["route"]["type"],
             "segments": r["route"]["segments"],
             "total_distance_km": r["route"]["total_distance_km"],
+            "data_source": r["route"].get("data_source", "unknown"),
             "total_cost_inr": r["cost"]["total_cost"],
             "cost_breakdown": r["cost"]["segments"],
             "total_time_hours": r["time"]["total_hours"],
@@ -201,6 +271,7 @@ def _format_best_route(best: dict) -> dict:
         "total_time_days": best["time"]["total_days"],
         "score": best["score"],
         "segments": best["route"]["segments"],
+        "data_source": best["route"].get("data_source", "unknown"),
     }
 
 

@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cost Analysis · ZeroDelay</title>
+  <meta name="description" content="Detailed cost breakdown across transport modes with fuel, toll, tax, and handling fee analysis. Decision engine for cost vs time optimization." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .cost-layout {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 32px 60px;
+    }
+
+    /* ─── Summary Cards ─────────────────────────── */
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    /* ─── Two Column Layout ─────────────────────── */
+    .cost-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    .cost-grid-full {
+      grid-column: 1 / -1;
+    }
+
+    /* ─── Cost Breakdown Table ───────────────────── */
+    .breakdown-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .breakdown-header {
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .breakdown-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .breakdown-body {
+      padding: 0;
+    }
+
+    /* Mode tab selector */
+    .mode-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .mode-tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all .2s;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+    }
+    .mode-tab:hover { color: var(--text); background: rgba(255,255,255,.02); }
+    .mode-tab.active-road  { color: var(--road); border-bottom-color: var(--road); background: rgba(249,115,22,.04); }
+    .mode-tab.active-rail  { color: var(--rail); border-bottom-color: var(--rail); background: rgba(139,92,246,.04); }
+    .mode-tab.active-sea   { color: var(--sea);  border-bottom-color: var(--sea);  background: rgba(34,211,238,.04); }
+
+    /* Breakdown rows */
+    .breakdown-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      border-bottom: 1px solid rgba(26,32,64,.3);
+      transition: background .2s;
+    }
+    .breakdown-row:last-child { border-bottom: none; }
+    .breakdown-row:hover { background: rgba(255,255,255,.015); }
+    .breakdown-row.total {
+      background: rgba(0,229,255,.03);
+      border-top: 1px solid var(--border);
+      font-weight: 700;
+    }
+    .br-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .br-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+    }
+    .br-sub {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .br-value {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .br-pct {
+      font-size: 10px;
+      color: var(--muted);
+      margin-left: 10px;
+      font-family: var(--mono);
+    }
+
+    /* ─── Visual Bar Chart ──────────────────────── */
+    .bar-chart {
+      padding: 24px;
+    }
+    .bar-chart-item {
+      margin-bottom: 18px;
+    }
+    .bar-chart-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .bar-chart-track {
+      height: 8px;
+      background: var(--bg);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .bar-chart-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 1.2s cubic-bezier(.22,1,.36,1);
+    }
+
+    /* ─── Decision Engine ───────────────────────── */
+    .decision-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .decision-option {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      cursor: pointer;
+      transition: all .3s;
+      position: relative;
+    }
+    .decision-option:hover {
+      border-color: var(--border2);
+      transform: translateY(-2px);
+    }
+    .decision-option.selected {
+      border-color: var(--cyan);
+      background: rgba(0,229,255,.03);
+    }
+    .decision-option.selected::after {
+      content: '✓ SELECTED';
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--cyan);
+      background: var(--cyan-dim);
+      padding: 3px 8px;
+      border-radius: 100px;
+    }
+    .do-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .do-desc {
+      font-size: 12px;
+      color: var(--muted2);
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+    .do-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .do-metric {
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+    }
+    .do-metric-label {
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .do-metric-value {
+      font-family: var(--mono);
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    /* ─── Time Breakdown ────────────────────────── */
+    .time-segments {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      height: 30px;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .time-seg {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: .5px;
+      color: #000;
+      transition: flex .5s cubic-bezier(.22,1,.36,1);
+    }
+    .time-legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .time-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted2);
+    }
+    .time-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    /* ─── Comparison Table ──────────────────────── */
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .comparison-table th {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 14px 18px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .comparison-table td {
+      padding: 16px 18px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(26,32,64,.3);
+      vertical-align: middle;
+    }
+    .comparison-table tr:hover td {
+      background: rgba(255,255,255,.015);
+    }
+    .comparison-table .best-val {
+      color: var(--green);
+      font-weight: 700;
+    }
+    .comparison-table .worst-val {
+      color: var(--red);
+      opacity: .7;
+    }
+
+    /* ─── Score gauge ───────────────────────────── */
+    .score-ring {
+      width: 80px;
+      height: 80px;
+      position: relative;
+      margin: 0 auto 10px;
+    }
+    .score-ring svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .score-ring-bg {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 4;
+    }
+    .score-ring-fill {
+      fill: none;
+      stroke-width: 4;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1);
+    }
+    .score-ring-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .summary-row { grid-template-columns: repeat(2, 1fr); }
+      .cost-grid { grid-template-columns: 1fr; }
+      .decision-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .summary-row { grid-template-columns: 1fr; }
+      .cost-layout { padding: 0 16px 40px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/><path d="M2 17L12 22L22 17" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/><path d="M2 12L12 17L22 12" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/><defs><linearGradient id="g1" x1="2" y1="2" x2="22" y2="22"><stop stop-color="#00e5ff"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs></svg>
+        </div>
+        <div>
+          <div class="brand-name">ZERODELAY</div>
+          <div class="brand-sub">Smart Supply Chain</div>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">Dashboard</a>
+        <a href="routes.html" class="nav-link">Route Planner</a>
+        <a href="cost.html" class="nav-link active">Cost Analysis</a>
+        <a href="ai-insights.html" class="nav-link">AI Insights</a>
+      </div>
+      <div class="nav-status">
+        <div class="status-dot"></div>
+        <span>System Online</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-content">
+    <div class="page-header">
+      <h1 class="page-title">Cost Analysis & <span class="gradient-text">Decision Engine</span></h1>
+      <p class="page-subtitle" id="route-subtitle">Compute a route first to see detailed cost breakdown and optimization recommendations.</p>
+    </div>
+
+    <div class="cost-layout">
+
+      <!-- Summary Cards -->
+      <div class="summary-row" id="summary-cards">
+        <div class="metric-card">
+          <div class="metric-label">Cheapest Route</div>
+          <div class="metric-value" id="sm-cheapest" style="color:var(--green)">--</div>
+          <div class="metric-change metric-up" id="sm-cheapest-mode">Awaiting data</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Fastest Route</div>
+          <div class="metric-value" id="sm-fastest" style="color:var(--cyan)">--</div>
+          <div class="metric-change metric-up" id="sm-fastest-mode">Awaiting data</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Lowest CO₂</div>
+          <div class="metric-value" id="sm-green" style="color:var(--green)">--</div>
+          <div class="metric-change metric-up" id="sm-green-mode">Awaiting data</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Recommendation</div>
+          <div class="metric-value" id="sm-rec" style="color:var(--amber)">--</div>
+          <div class="metric-change" id="sm-rec-reason">Awaiting data</div>
+        </div>
+      </div>
+
+      <div class="cost-grid">
+
+        <!-- Cost Breakdown Table -->
+        <div class="breakdown-card">
+          <div class="breakdown-header">
+            <div class="breakdown-title" style="color:var(--cyan)">
+              💰 Detailed Cost Breakdown
+            </div>
+          </div>
+          <div class="mode-tabs" id="cost-mode-tabs">
+            <div class="mode-tab active-road" data-mode="road" onclick="selectCostMode('road')">🚛 Road</div>
+            <div class="mode-tab" data-mode="rail" onclick="selectCostMode('rail')">🚂 Rail</div>
+            <div class="mode-tab" data-mode="sea" onclick="selectCostMode('sea')">🚢 Sea</div>
+          </div>
+          <div class="breakdown-body" id="cost-breakdown-body">
+            <div class="empty-state" style="padding:40px 20px">
+              <div class="empty-icon">💰</div>
+              <div class="empty-title">No Data Yet</div>
+              <div class="empty-subtitle">Go to Route Planner and compute a route first</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Time Estimation -->
+        <div class="breakdown-card">
+          <div class="breakdown-header">
+            <div class="breakdown-title" style="color:var(--cyan)">
+              ⏱ Time Estimation Breakdown
+            </div>
+          </div>
+          <div class="mode-tabs" id="time-mode-tabs">
+            <div class="mode-tab active-road" data-mode="road" onclick="selectTimeMode('road')">🚛 Road</div>
+            <div class="mode-tab" data-mode="rail" onclick="selectTimeMode('rail')">🚂 Rail</div>
+            <div class="mode-tab" data-mode="sea" onclick="selectTimeMode('sea')">🚢 Sea</div>
+          </div>
+          <div id="time-breakdown-body">
+            <div class="empty-state" style="padding:40px 20px">
+              <div class="empty-icon">⏱</div>
+              <div class="empty-title">No Data Yet</div>
+              <div class="empty-subtitle">Compute a route to see time estimates</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Decision Engine -->
+        <div class="breakdown-card cost-grid-full">
+          <div class="breakdown-header">
+            <div class="breakdown-title" style="color:var(--amber)">
+              ⚖️ Decision Engine — Cost vs Time Trade-off
+            </div>
+          </div>
+          <div style="padding:24px" id="decision-body">
+            <div class="empty-state">
+              <div class="empty-icon">⚖️</div>
+              <div class="empty-title">Decision Engine</div>
+              <div class="empty-subtitle">Compute a route to activate the decision engine and compare optimization strategies.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Side-by-side comparison -->
+        <div class="breakdown-card cost-grid-full">
+          <div class="breakdown-header">
+            <div class="breakdown-title" style="color:var(--purple)">
+              📊 Mode Comparison Matrix
+            </div>
+          </div>
+          <div id="comparison-body">
+            <div class="empty-state" style="padding:40px 20px">
+              <div class="empty-icon">📊</div>
+              <div class="empty-title">No Data Yet</div>
+              <div class="empty-subtitle">Compute a route to see the comparison matrix</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <footer id="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="brand-name" style="font-size:16px;">ZERODELAY</div>
+        <p style="color:var(--muted);font-size:12px;margin-top:6px;">Smart Supply Chain Optimizer</p>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Dashboard</a>
+        <a href="routes.html">Route Planner</a>
+        <a href="cost.html">Cost Analysis</a>
+        <a href="ai-insights.html">AI Insights</a>
+      </div>
+      <div class="footer-copy">© 2026 ZeroDelay</div>
+    </div>
+  </footer>
+
+  <div id="toast"></div>
+
+  <script src="main.js"></script>
+  <script>
+  /* ══════════════════════════════════════════════════
+     COST PAGE LOGIC
+  ══════════════════════════════════════════════════ */
+
+  let costData = null;
+  let currentCostMode = 'road';
+  let currentTimeMode = 'road';
+
+  // Load data from localStorage (computed on Routes page)
+  function loadData() {
+    const raw = localStorage.getItem('zerodelay_last_result');
+    if (!raw) return;
+    costData = JSON.parse(raw);
+    document.getElementById('route-subtitle').textContent =
+      `${costData.origin} → ${costData.destination} · ${costData.total_km.toLocaleString()} km · Optimized for ${costData.optimize}`;
+    renderSummary();
+    selectCostMode('road');
+    selectTimeMode('road');
+    renderDecisionEngine();
+    renderComparison();
+  }
+
+  // ─── Generate cost breakdown per mode ──────────
+  function getCostBreakdown(route) {
+    const total = route.cost_usd;
+    const dist = route.dist_km;
+    const weight = costData.weight || 20;
+
+    // Breakdown factors
+    let breakdown;
+    if (route.mode === 'road') {
+      breakdown = [
+        { icon: '📏', label: 'Distance Charge', sub: `${dist.toLocaleString()} km × $0.85/km`, amount: Math.round(dist * 0.85), color: 'var(--road)' },
+        { icon: '⛽', label: 'Fuel Surcharge', sub: `Diesel @ $1.42/L · Est. ${Math.round(dist * 0.35)}L`, amount: Math.round(dist * 0.35 * 1.42), color: 'var(--amber)' },
+        { icon: '🛣', label: 'Toll Fees', sub: `Highway tolls · ${Math.round(dist / 100)} toll points`, amount: Math.round(dist * 0.12), color: 'var(--muted2)' },
+        { icon: '📋', label: 'Tax & Duties', sub: `GST/VAT @ 18%`, amount: Math.round(total * 0.08), color: 'var(--purple)' },
+        { icon: '📦', label: 'Loading/Unloading', sub: `${weight}T @ $12/T`, amount: Math.round(weight * 12), color: 'var(--cyan)' },
+        { icon: '🛡', label: 'Insurance', sub: 'Cargo insurance @ 0.3%', amount: Math.round(total * 0.015), color: 'var(--green)' },
+      ];
+    } else if (route.mode === 'rail') {
+      breakdown = [
+        { icon: '📏', label: 'Distance Charge', sub: `${dist.toLocaleString()} km × $0.55/km`, amount: Math.round(dist * 0.55), color: 'var(--rail)' },
+        { icon: '⚡', label: 'Energy Surcharge', sub: 'Electric/diesel traction', amount: Math.round(dist * 0.18), color: 'var(--amber)' },
+        { icon: '🏗', label: 'Terminal Handling', sub: 'Loading + unloading fees', amount: Math.round(weight * 18), color: 'var(--muted2)' },
+        { icon: '📋', label: 'Tax & Duties', sub: 'GST/VAT @ 12%', amount: Math.round(total * 0.06), color: 'var(--purple)' },
+        { icon: '📦', label: 'Container Charges', sub: `${Math.ceil(weight / 25)} containers`, amount: Math.round(Math.ceil(weight / 25) * 320), color: 'var(--cyan)' },
+        { icon: '🛡', label: 'Insurance', sub: 'Cargo insurance @ 0.25%', amount: Math.round(total * 0.012), color: 'var(--green)' },
+      ];
+    } else {
+      breakdown = [
+        { icon: '📏', label: 'Freight Charge', sub: `${dist.toLocaleString()} km × $0.22/km`, amount: Math.round(dist * 0.22), color: 'var(--sea)' },
+        { icon: '⛽', label: 'Bunker Fuel Adj.', sub: 'BAF surcharge', amount: Math.round(dist * 0.08), color: 'var(--amber)' },
+        { icon: '⚓', label: 'Port Handling', sub: 'THC origin + destination', amount: Math.round(weight * 25), color: 'var(--muted2)' },
+        { icon: '📋', label: 'Customs & Duties', sub: 'Documentation + clearance', amount: Math.round(total * 0.05), color: 'var(--purple)' },
+        { icon: '📦', label: 'Container Charges', sub: `${Math.ceil(weight / 20)} × 20ft TEU`, amount: Math.round(Math.ceil(weight / 20) * 450), color: 'var(--cyan)' },
+        { icon: '🛡', label: 'Marine Insurance', sub: 'ICC(A) coverage @ 0.5%', amount: Math.round(total * 0.02), color: 'var(--green)' },
+      ];
+    }
+
+    // Normalize to match total
+    const sum = breakdown.reduce((a, b) => a + b.amount, 0);
+    const scale = total / sum;
+    breakdown.forEach(b => b.amount = Math.round(b.amount * scale));
+
+    return breakdown;
+  }
+
+  // ─── Summary ───────────────────────────────────
+  function renderSummary() {
+    if (!costData) return;
+    const routes = costData.routes;
+
+    const cheapest = routes.reduce((a, b) => a.cost_usd < b.cost_usd ? a : b);
+    const fastest = routes.reduce((a, b) => a.time_h < b.time_h ? a : b);
+    const greenest = routes.reduce((a, b) => a.co2_kg < b.co2_kg ? a : b);
+
+    document.getElementById('sm-cheapest').textContent = '$' + cheapest.cost_usd.toLocaleString();
+    document.getElementById('sm-cheapest-mode').textContent = 'via ' + cheapest.mode.toUpperCase();
+    document.getElementById('sm-fastest').textContent = formatTime(fastest.time_h);
+    document.getElementById('sm-fastest-mode').textContent = 'via ' + fastest.mode.toUpperCase();
+    document.getElementById('sm-green').textContent = greenest.co2_kg.toLocaleString() + ' kg';
+    document.getElementById('sm-green-mode').textContent = 'via ' + greenest.mode.toUpperCase();
+    document.getElementById('sm-rec').textContent = costData.rec.toUpperCase();
+    document.getElementById('sm-rec-reason').textContent = costData.optimize + ' optimized';
+  }
+
+  // ─── Cost breakdown by mode ────────────────────
+  function selectCostMode(mode) {
+    currentCostMode = mode;
+    document.querySelectorAll('#cost-mode-tabs .mode-tab').forEach(t => {
+      t.className = 'mode-tab' + (t.dataset.mode === mode ? ' active-' + mode : '');
+    });
+    if (!costData) return;
+    const route = costData.routes.find(r => r.mode === mode);
+    if (!route) return;
+    const breakdown = getCostBreakdown(route);
+    const total = route.cost_usd;
+
+    let html = breakdown.map(b => `
+      <div class="breakdown-row">
+        <div class="br-label">
+          <div class="br-icon">${b.icon}</div>
+          <div>
+            <div>${b.label}</div>
+            <div class="br-sub">${b.sub}</div>
+          </div>
+        </div>
+        <div>
+          <span class="br-value" style="color:${b.color}">$${b.amount.toLocaleString()}</span>
+          <span class="br-pct">${Math.round(b.amount / total * 100)}%</span>
+        </div>
+      </div>
+    `).join('');
+
+    html += `
+      <div class="breakdown-row total">
+        <div class="br-label"><div class="br-icon">Σ</div><div>Total Estimated Cost</div></div>
+        <div><span class="br-value" style="color:var(--cyan);font-size:16px">$${total.toLocaleString()}</span></div>
+      </div>
+    `;
+
+    // Add visual bar chart
+    html += '<div class="bar-chart">';
+    breakdown.forEach(b => {
+      html += `
+        <div class="bar-chart-item">
+          <div class="bar-chart-label">
+            <span>${b.label}</span>
+            <span style="font-family:var(--mono);color:${b.color}">$${b.amount.toLocaleString()}</span>
+          </div>
+          <div class="bar-chart-track">
+            <div class="bar-chart-fill" style="width:${Math.round(b.amount / total * 100)}%;background:${b.color}"></div>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    document.getElementById('cost-breakdown-body').innerHTML = html;
+
+    // Trigger bar animation
+    setTimeout(() => {
+      document.querySelectorAll('.bar-chart-fill').forEach(el => {
+        el.style.width = el.style.width; // Force reflow
+      });
+    }, 50);
+  }
+
+  // ─── Time breakdown by mode ────────────────────
+  function selectTimeMode(mode) {
+    currentTimeMode = mode;
+    document.querySelectorAll('#time-mode-tabs .mode-tab').forEach(t => {
+      t.className = 'mode-tab' + (t.dataset.mode === mode ? ' active-' + mode : '');
+    });
+    if (!costData) return;
+    const route = costData.routes.find(r => r.mode === mode);
+    if (!route) return;
+
+    const baseTime = route.time_h;
+    const delays = route.delays || {};
+    const totalDelay = Object.values(delays).reduce((a, b) => a + b, 0);
+    const totalTime = baseTime + totalDelay;
+
+    const colors = {
+      transit: mode === 'road' ? '#f97316' : mode === 'rail' ? '#8b5cf6' : '#22d3ee',
+      traffic: '#ef4444',
+      loading: '#f59e0b',
+      customs: '#a855f7',
+      weather: '#6366f1',
+      port: '#14b8a6',
+    };
+
+    // Time segments
+    const segments = [
+      { label: 'Transit', hours: baseTime, color: colors.transit },
+    ];
+    Object.entries(delays).forEach(([key, val]) => {
+      if (val > 0) segments.push({ label: key.charAt(0).toUpperCase() + key.slice(1), hours: val, color: colors[key] || '#4e6080' });
+    });
+
+    const segHTML = segments.map(s => `
+      <div class="time-seg" style="flex:${s.hours};background:${s.color}" title="${s.label}: ${s.hours}h">
+        ${s.hours > totalTime * 0.1 ? s.hours + 'h' : ''}
+      </div>
+    `).join('');
+
+    const legendHTML = segments.map(s => `
+      <div class="time-legend-item">
+        <div class="time-legend-dot" style="background:${s.color}"></div>
+        ${s.label}: <strong style="color:var(--text)">${s.hours}h</strong>
+      </div>
+    `).join('');
+
+    document.getElementById('time-breakdown-body').innerHTML = `
+      <div style="padding:24px">
+        <div class="time-segments">${segHTML}</div>
+        <div class="time-legend" style="margin-bottom:24px">${legendHTML}</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px">
+          <div class="metric-card" style="padding:14px">
+            <div class="metric-label">Base Transit</div>
+            <div class="metric-value" style="font-size:18px;color:${colors.transit}">${formatTime(baseTime)}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px">${route.speed_kmh || '--'} km/h avg</div>
+          </div>
+          <div class="metric-card" style="padding:14px">
+            <div class="metric-label">Total Delays</div>
+            <div class="metric-value" style="font-size:18px;color:var(--amber)">${formatTime(totalDelay)}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px">${Math.round(totalDelay / totalTime * 100)}% of total</div>
+          </div>
+          <div class="metric-card" style="padding:14px">
+            <div class="metric-label">Total Time</div>
+            <div class="metric-value" style="font-size:18px;color:var(--text)">${formatTime(totalTime)}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px">${route.dist_km.toLocaleString()} km route</div>
+          </div>
+        </div>
+
+        <div class="ai-card">
+          <div class="ai-card-header">
+            <div class="ai-orb">⏱</div>
+            <div class="ai-card-title">Time Analysis</div>
+          </div>
+          <div class="ai-card-body">
+            <strong>${mode.toUpperCase()} route</strong> covers ${route.dist_km.toLocaleString()} km at an average speed of ${route.speed_kmh || '--'} km/h. 
+            ${totalDelay > 0 ? `Expected delays add approximately <strong>${formatTime(totalDelay)}</strong> to the base transit time, primarily from ${Object.entries(delays).sort((a,b) => b[1]-a[1])[0][0]} (${Object.entries(delays).sort((a,b) => b[1]-a[1])[0][1]}h).` : ''}
+            A buffer of 15-20% is recommended for scheduling purposes.
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ─── Decision Engine ───────────────────────────
+  function renderDecisionEngine() {
+    if (!costData) return;
+    const routes = costData.routes;
+
+    const cheapest = routes.reduce((a, b) => a.cost_usd < b.cost_usd ? a : b);
+    const fastest = routes.reduce((a, b) => a.time_h < b.time_h ? a : b);
+
+    const costSaving = routes.reduce((a, b) => a.cost_usd > b.cost_usd ? a : b).cost_usd - cheapest.cost_usd;
+    const timeSaving = routes.reduce((a, b) => a.time_h > b.time_h ? a : b).time_h - fastest.time_h;
+
+    // Score calculation (higher = better)
+    const costScores = routes.map(r => ({ mode: r.mode, score: Math.round((1 - r.cost_usd / routes.reduce((a, b) => a.cost_usd > b.cost_usd ? a : b).cost_usd) * 100) }));
+    const timeScores = routes.map(r => ({ mode: r.mode, score: Math.round((1 - r.time_h / routes.reduce((a, b) => a.time_h > b.time_h ? a : b).time_h) * 100) }));
+
+    const selected = costData.optimize;
+
+    document.getElementById('decision-body').innerHTML = `
+      <div class="decision-grid">
+        <div class="decision-option ${selected === 'cost' ? 'selected' : ''}" onclick="this.classList.toggle('selected')">
+          <div class="do-title">💰 Cost Optimization</div>
+          <div class="do-desc">Minimize total logistics cost. Best for non-time-sensitive cargo with flexible scheduling.</div>
+          <div class="do-metrics">
+            <div class="do-metric">
+              <div class="do-metric-label">Best Mode</div>
+              <div class="do-metric-value" style="color:var(--green)">${cheapest.mode.toUpperCase()}</div>
+            </div>
+            <div class="do-metric">
+              <div class="do-metric-label">Savings</div>
+              <div class="do-metric-value" style="color:var(--green)">$${costSaving.toLocaleString()}</div>
+            </div>
+            <div class="do-metric">
+              <div class="do-metric-label">Cost</div>
+              <div class="do-metric-value">$${cheapest.cost_usd.toLocaleString()}</div>
+            </div>
+            <div class="do-metric">
+              <div class="do-metric-label">Time</div>
+              <div class="do-metric-value">${formatTime(cheapest.time_h)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="decision-option ${selected === 'time' ? 'selected' : ''}" onclick="this.classList.toggle('selected')">
+          <div class="do-title">⚡ Time Optimization</div>
+          <div class="do-desc">Minimize transit time. Best for perishable goods, urgent deliveries, and just-in-time supply chains.</div>
+          <div class="do-metrics">
+            <div class="do-metric">
+              <div class="do-metric-label">Best Mode</div>
+              <div class="do-metric-value" style="color:var(--cyan)">${fastest.mode.toUpperCase()}</div>
+            </div>
+            <div class="do-metric">
+              <div class="do-metric-label">Time Saved</div>
+              <div class="do-metric-value" style="color:var(--cyan)">${formatTime(timeSaving)}</div>
+            </div>
+            <div class="do-metric">
+              <div class="do-metric-label">Cost</div>
+              <div class="do-metric-value">$${fastest.cost_usd.toLocaleString()}</div>
+            </div>
+            <div class="do-metric">
+              <div class="do-metric-label">Time</div>
+              <div class="do-metric-value">${formatTime(fastest.time_h)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-card" style="margin-top:8px">
+        <div class="ai-card-header">
+          <div class="ai-orb">⚖️</div>
+          <div class="ai-card-title">Decision Engine Recommendation</div>
+        </div>
+        <div class="ai-card-body">
+          Based on <strong>${costData.optimize}</strong> optimization for ${costData.origin} → ${costData.destination}:
+          <br/><br/>
+          <strong>${costData.rec.toUpperCase()}</strong> is the recommended transport mode. 
+          ${costData.rec === cheapest.mode ? `It offers the lowest cost at <strong>$${cheapest.cost_usd.toLocaleString()}</strong>, saving $${costSaving.toLocaleString()} compared to the most expensive option.` : ''}
+          ${costData.rec === fastest.mode ? `It provides the fastest transit at <strong>${formatTime(fastest.time_h)}</strong>, saving ${formatTime(timeSaving)} compared to the slowest option.` : ''}
+          ${costData.rec !== cheapest.mode && costData.rec !== fastest.mode ? `It provides the best balance between cost ($${routes.find(r=>r.mode===costData.rec).cost_usd.toLocaleString()}) and time (${formatTime(routes.find(r=>r.mode===costData.rec).time_h)}).` : ''}
+          <br/><br/>
+          <strong>Trade-off:</strong> Choosing the cheapest route (${cheapest.mode.toUpperCase()}) saves $${costSaving.toLocaleString()} but takes ${formatTime(routes.find(r => r.mode === cheapest.mode).time_h - fastest.time_h)} longer than the fastest option (${fastest.mode.toUpperCase()}).
+        </div>
+      </div>
+    `;
+  }
+
+  // ─── Comparison Table ──────────────────────────
+  function renderComparison() {
+    if (!costData) return;
+    const routes = costData.routes;
+    const modeColors = { road: 'var(--road)', rail: 'var(--rail)', sea: 'var(--sea)' };
+    const modeEmoji = { road: '🚛', rail: '🚂', sea: '🚢' };
+
+    const minCost = Math.min(...routes.map(r => r.cost_usd));
+    const maxCost = Math.max(...routes.map(r => r.cost_usd));
+    const minTime = Math.min(...routes.map(r => r.time_h));
+    const maxTime = Math.max(...routes.map(r => r.time_h));
+    const minCO2 = Math.min(...routes.map(r => r.co2_kg));
+    const maxCO2 = Math.max(...routes.map(r => r.co2_kg));
+
+    const metrics = [
+      { label: 'Distance', key: 'dist_km', fmt: v => v.toLocaleString() + ' km' },
+      { label: 'Transit Time', key: 'time_h', fmt: v => formatTime(v), best: minTime, worst: maxTime },
+      { label: 'Total Cost', key: 'cost_usd', fmt: v => '$' + v.toLocaleString(), best: minCost, worst: maxCost },
+      { label: 'CO₂ Emissions', key: 'co2_kg', fmt: v => v.toLocaleString() + ' kg', best: minCO2, worst: maxCO2 },
+      { label: 'Avg Speed', key: 'speed_kmh', fmt: v => (v || '--') + ' km/h' },
+      { label: 'Risk Level', key: 'risk', fmt: v => v || 'Low' },
+    ];
+
+    let html = '<table class="comparison-table"><thead><tr><th>Metric</th>';
+    routes.forEach(r => {
+      html += `<th style="color:${modeColors[r.mode]}">${modeEmoji[r.mode]} ${r.mode.toUpperCase()}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    metrics.forEach(m => {
+      html += `<tr><td style="font-weight:600;letter-spacing:.5px">${m.label}</td>`;
+      routes.forEach(r => {
+        const val = r[m.key];
+        let cls = '';
+        if (m.best !== undefined && val === m.best) cls = 'best-val';
+        if (m.worst !== undefined && val === m.worst) cls = 'worst-val';
+        html += `<td class="mono ${cls}">${m.fmt(val)}</td>`;
+      });
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('comparison-body').innerHTML = html;
+  }
+
+  // ─── Init ──────────────────────────────────────
+  loadData();
+  </script>
+</body>
+</html>

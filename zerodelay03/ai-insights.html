@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Insights · ZeroDelay</title>
+  <meta name="description" content="AI-powered route explanation, disruption insights, and anomaly detection for intelligent supply chain optimization." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .ai-layout {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 32px 60px;
+    }
+
+    /* ─── Input Bar ─────────────────────────────── */
+    .ai-input-bar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 16px;
+      align-items: end;
+    }
+    .ai-input-bar .btn-primary {
+      height: 44px;
+    }
+
+    /* ─── AI Feature Tabs ──────────────────────── */
+    .ai-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 32px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px;
+    }
+    .ai-tab {
+      flex: 1;
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .ai-tab:hover { color: var(--text); background: rgba(255,255,255,.03); }
+    .ai-tab.active {
+      background: linear-gradient(135deg, rgba(0,229,255,.08), rgba(124,58,237,.08));
+      color: var(--cyan);
+      border: 1px solid rgba(0,229,255,.2);
+    }
+
+    /* ─── AI Content Panels ────────────────────── */
+    .ai-panel { display: none; }
+    .ai-panel.active { display: block; }
+
+    /* ─── Route Explanation ─────────────────────── */
+    .explanation-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .explanation-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .explanation-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(0,229,255,.12), rgba(124,58,237,.12));
+      border: 1px solid rgba(0,229,255,.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+    .explanation-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .explanation-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .explanation-body {
+      padding: 24px;
+    }
+    .explanation-section {
+      margin-bottom: 24px;
+    }
+    .explanation-section:last-child { margin-bottom: 0; }
+    .es-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .es-content {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text2);
+    }
+    .es-content strong { color: var(--text); }
+
+    /* Factor cards */
+    .factor-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .factor-card {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      transition: all .3s;
+    }
+    .factor-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-2px);
+    }
+    .factor-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .factor-icon {
+      font-size: 20px;
+    }
+    .factor-title {
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .factor-body {
+      font-size: 12px;
+      color: var(--muted2);
+      line-height: 1.6;
+    }
+    .factor-impact {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .impact-high { color: var(--red); }
+    .impact-medium { color: var(--amber); }
+    .impact-low { color: var(--green); }
+
+    /* ─── Disruption List ──────────────────────── */
+    .disruption-timeline {
+      position: relative;
+      padding-left: 32px;
+    }
+    .disruption-timeline::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(180deg, var(--cyan), var(--purple), var(--amber));
+      opacity: .3;
+    }
+    .disruption-item {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+      transition: all .3s;
+    }
+    .disruption-item:hover {
+      border-color: var(--border2);
+      transform: translateX(4px);
+    }
+    .disruption-item::before {
+      content: '';
+      position: absolute;
+      left: -26px;
+      top: 24px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid;
+    }
+    .disruption-item.severity-high::before { border-color: var(--red); background: rgba(239,68,68,.3); }
+    .disruption-item.severity-medium::before { border-color: var(--amber); background: rgba(245,158,11,.3); }
+    .disruption-item.severity-low::before { border-color: var(--green); background: rgba(16,185,129,.3); }
+    .di-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .di-title {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .di-severity {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 3px 10px;
+      border-radius: 100px;
+    }
+    .sev-high   { background: rgba(239,68,68,.12); color: var(--red); }
+    .sev-medium { background: rgba(245,158,11,.12); color: var(--amber); }
+    .sev-low    { background: rgba(16,185,129,.12); color: var(--green); }
+    .di-body {
+      font-size: 13px;
+      color: var(--muted2);
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+    .di-meta {
+      display: flex;
+      gap: 20px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .di-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* ─── Anomaly Cards ────────────────────────── */
+    .anomaly-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .anomaly-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: all .3s;
+    }
+    .anomaly-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-lg);
+    }
+    .anomaly-top {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .anomaly-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .anomaly-icon.critical {
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.2);
+    }
+    .anomaly-icon.warning {
+      background: rgba(245,158,11,.1);
+      border: 1px solid rgba(245,158,11,.2);
+    }
+    .anomaly-icon.info {
+      background: rgba(0,229,255,.1);
+      border: 1px solid rgba(0,229,255,.2);
+    }
+    .anomaly-type {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 100px;
+    }
+    .type-critical { background: rgba(239,68,68,.1); color: var(--red); }
+    .type-warning  { background: rgba(245,158,11,.1); color: var(--amber); }
+    .type-info     { background: rgba(0,229,255,.1); color: var(--cyan); }
+    .anomaly-body {
+      padding: 20px;
+    }
+    .anomaly-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .anomaly-desc {
+      font-size: 13px;
+      color: var(--muted2);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+    .anomaly-recommendation {
+      background: rgba(16,185,129,.05);
+      border: 1px solid rgba(16,185,129,.15);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .ar-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 6px;
+    }
+    .ar-text {
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--text2);
+    }
+
+    /* ─── AI Typing Animation ──────────────────── */
+    .typing-indicator {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      padding: 8px 16px;
+      background: var(--card2);
+      border-radius: 100px;
+      margin-bottom: 16px;
+    }
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cyan);
+      animation: typing-bounce .6s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: .1s; }
+    .typing-dot:nth-child(3) { animation-delay: .2s; }
+    @keyframes typing-bounce {
+      0%, 100% { transform: translateY(0); opacity: .4; }
+      50% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .ai-input-bar { grid-template-columns: 1fr; }
+      .ai-tabs { flex-direction: column; }
+      .anomaly-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .ai-layout { padding: 0 16px 40px; }
+      .factor-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/><path d="M2 17L12 22L22 17" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/><path d="M2 12L12 17L22 12" stroke="url(#g1)" stroke-width="2" stroke-linejoin="round"/><defs><linearGradient id="g1" x1="2" y1="2" x2="22" y2="22"><stop stop-color="#00e5ff"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs></svg>
+        </div>
+        <div>
+          <div class="brand-name">ZERODELAY</div>
+          <div class="brand-sub">Smart Supply Chain</div>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">Dashboard</a>
+        <a href="routes.html" class="nav-link">Route Planner</a>
+        <a href="cost.html" class="nav-link">Cost Analysis</a>
+        <a href="ai-insights.html" class="nav-link active">AI Insights</a>
+      </div>
+      <div class="nav-status">
+        <div class="status-dot"></div>
+        <span>AI Engine Online</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-content">
+    <div class="page-header">
+      <h1 class="page-title">AI-Powered <span class="gradient-text">Intelligence Hub</span></h1>
+      <p class="page-subtitle">Route explanations, disruption insights, and anomaly detection — powered by LLM APIs.</p>
+    </div>
+
+    <div class="ai-layout">
+
+      <!-- Input Bar -->
+      <div class="ai-input-bar">
+        <div>
+          <label>Origin</label>
+          <input id="ai-origin" type="text" placeholder="e.g. Mumbai, India" />
+        </div>
+        <div>
+          <label>Destination</label>
+          <input id="ai-dest" type="text" placeholder="e.g. Shanghai, China" />
+        </div>
+        <button class="btn-primary" onclick="runAIAnalysis()" id="ai-analyze-btn">
+          <span>🤖 Analyze</span>
+        </button>
+      </div>
+
+      <!-- AI Feature Tabs -->
+      <div class="ai-tabs">
+        <div class="ai-tab active" data-panel="route-explanation" onclick="switchAITab(this)">
+          🧠 Route Explanation
+        </div>
+        <div class="ai-tab" data-panel="disruption-insights" onclick="switchAITab(this)">
+          ⚠️ Disruption Insights
+        </div>
+        <div class="ai-tab" data-panel="anomaly-detection" onclick="switchAITab(this)">
+          📊 Anomaly Detection
+        </div>
+      </div>
+
+      <!-- Panel 1: Route Explanation -->
+      <div class="ai-panel active" id="panel-route-explanation">
+        <div id="route-explanation-content">
+          <div class="explanation-card">
+            <div class="explanation-header">
+              <div class="explanation-icon">🧠</div>
+              <div>
+                <div class="explanation-title">LLM-Powered Route Explanation</div>
+                <div class="explanation-subtitle">Enter origin and destination, then click Analyze to get AI-generated route reasoning</div>
+              </div>
+            </div>
+            <div class="explanation-body">
+              <div class="empty-state">
+                <div class="empty-icon">🤖</div>
+                <div class="empty-title">Ready for Analysis</div>
+                <div class="empty-subtitle">Enter a route above and click Analyze.<br/>The AI will explain why specific routes are recommended.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Disruption Insights -->
+      <div class="ai-panel" id="panel-disruption-insights">
+        <div id="disruption-content">
+          <div class="explanation-card">
+            <div class="explanation-header">
+              <div class="explanation-icon">⚠️</div>
+              <div>
+                <div class="explanation-title">Disruption Intelligence</div>
+                <div class="explanation-subtitle">Real-time analysis of weather, geopolitical, and operational disruptions</div>
+              </div>
+            </div>
+            <div class="explanation-body">
+              <div class="empty-state">
+                <div class="empty-icon">🌍</div>
+                <div class="empty-title">Enter a Route</div>
+                <div class="empty-subtitle">Provide origin and destination to analyze<br/>potential disruptions along the corridor.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 3: Anomaly Detection -->
+      <div class="ai-panel" id="panel-anomaly-detection">
+        <div id="anomaly-content">
+          <div class="explanation-card">
+            <div class="explanation-header">
+              <div class="explanation-icon">📊</div>
+              <div>
+                <div class="explanation-title">Anomaly Detection Engine</div>
+                <div class="explanation-subtitle">Identifies inefficient routes, cost spikes, and deviations from optimal paths</div>
+              </div>
+            </div>
+            <div class="explanation-body">
+              <div class="empty-state">
+                <div class="empty-icon">🔍</div>
+                <div class="empty-title">Analyze a Route</div>
+                <div class="empty-subtitle">The anomaly detector will flag<br/>inefficiencies and suggest corrections.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer id="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="brand-name" style="font-size:16px;">ZERODELAY</div>
+        <p style="color:var(--muted);font-size:12px;margin-top:6px;">Smart Supply Chain Optimizer</p>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Dashboard</a>
+        <a href="routes.html">Route Planner</a>
+        <a href="cost.html">Cost Analysis</a>
+        <a href="ai-insights.html">AI Insights</a>
+      </div>
+      <div class="footer-copy">© 2026 ZeroDelay</div>
+    </div>
+  </footer>
+
+  <div id="toast"></div>
+
+  <script src="main.js"></script>
+  <script>
+  /* ══════════════════════════════════════════════════
+     AI INSIGHTS PAGE LOGIC
+  ══════════════════════════════════════════════════ */
+
+  // Load last route data if available
+  const savedData = JSON.parse(localStorage.getItem('zerodelay_last_result') || 'null');
+  if (savedData) {
+    document.getElementById('ai-origin').value = savedData.origin || '';
+    document.getElementById('ai-dest').value = savedData.destination || '';
+  }
+
+  // ─── Tab switching ─────────────────────────────
+  function switchAITab(el) {
+    document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.ai-panel').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('panel-' + el.dataset.panel).classList.add('active');
+  }
+
+  // ─── Run AI Analysis ──────────────────────────
+  async function runAIAnalysis() {
+    const origin = document.getElementById('ai-origin').value.trim();
+    const dest = document.getElementById('ai-dest').value.trim();
+
+    if (!origin || !dest) {
+      showToast('⚠ Please enter both origin and destination', '#f97316');
+      return;
+    }
+
+    const btn = document.getElementById('ai-analyze-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div> Analyzing…';
+
+    // Try to call Flask AI APIs
+    let routeExplanation = null, disruptions = null, anomalies = null;
+    const apiBase = (savedData && savedData.api_url) || 'http://localhost:5000';
+
+    try {
+      const [r1, r2, r3] = await Promise.allSettled([
+        fetch(`${apiBase}/api/explain`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ origin, destination: dest }),
+          signal: AbortSignal.timeout(5000)
+        }).then(r => r.ok ? r.json() : null),
+        fetch(`${apiBase}/api/disruptions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ origin, destination: dest }),
+          signal: AbortSignal.timeout(5000)
+        }).then(r => r.ok ? r.json() : null),
+        fetch(`${apiBase}/api/anomalies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ origin, destination: dest }),
+          signal: AbortSignal.timeout(5000)
+        }).then(r => r.ok ? r.json() : null),
+      ]);
+      routeExplanation = r1.status === 'fulfilled' ? r1.value : null;
+      disruptions = r2.status === 'fulfilled' ? r2.value : null;
+      anomalies = r3.status === 'fulfilled' ? r3.value : null;
+    } catch { /* use mock */ }
+
+    // Generate mock data if APIs unavailable
+    if (!routeExplanation) routeExplanation = mockRouteExplanation(origin, dest);
+    if (!disruptions) disruptions = mockDisruptions(origin, dest);
+    if (!anomalies) anomalies = mockAnomalies(origin, dest);
+
+    // Simulate processing delay for effect
+    await new Promise(r => setTimeout(r, 1200));
+
+    renderRouteExplanation(routeExplanation, origin, dest);
+    renderDisruptions(disruptions, origin, dest);
+    renderAnomalies(anomalies, origin, dest);
+
+    btn.disabled = false;
+    btn.innerHTML = '<span>🤖 Analyze</span>';
+    showToast('✓ AI analysis complete', '#10b981');
+  }
+
+  // ─── Mock Data Generators ─────────────────────
+
+  function mockRouteExplanation(origin, dest) {
+    return {
+      summary: `The AI engine has evaluated 3 transport modes for the <strong>${origin} → ${dest}</strong> corridor. Based on distance, logistics infrastructure, cargo constraints, and current market conditions, the analysis produces the following recommendation.`,
+      recommendation: {
+        mode: 'sea',
+        reason: `Sea freight is recommended for the ${origin} → ${dest} corridor as it offers the lowest per-unit cost and CO₂ footprint. The route benefits from established shipping lanes, frequent vessel schedules, and modern port infrastructure at both ends.`
+      },
+      factors: [
+        {
+          icon: '📏', title: 'Distance Analysis',
+          body: `The great-circle distance between ${origin} and ${dest} spans a significant maritime corridor. Sea routes, while ~50% longer in absolute distance, leverage naval highways that are optimized for container throughput.`,
+          impact: 'high', impactLabel: 'Major factor'
+        },
+        {
+          icon: '💰', title: 'Cost Structure',
+          body: `Sea freight costs approximately $0.22/km vs $0.85/km for road and $0.55/km for rail. For bulk cargo, this translates to substantial savings of 60-75% over road transport.`,
+          impact: 'high', impactLabel: 'Decisive factor'
+        },
+        {
+          icon: '⏱', title: 'Transit Time',
+          body: `Sea transit is the slowest option (~18 km/h avg). However, for non-perishable goods, the cost savings outweigh the time penalty. Port handling adds 24-48h at each terminus.`,
+          impact: 'medium', impactLabel: 'Trade-off factor'
+        },
+        {
+          icon: '🌱', title: 'Environmental Impact',
+          body: `Sea freight produces ~0.009 kg CO₂ per km vs 0.148 kg/km for road — a 94% reduction. This aligns with sustainability goals and potential carbon credit benefits.`,
+          impact: 'medium', impactLabel: 'Supporting factor'
+        },
+        {
+          icon: '⚡', title: 'Infrastructure',
+          body: `Both ${origin} and ${dest} have major international ports with deep-water berths, container handling facilities, and established customs processes.`,
+          impact: 'low', impactLabel: 'Enabling factor'
+        },
+        {
+          icon: '📊', title: 'Market Conditions',
+          body: `Current freight rates on this lane are within normal range. No capacity constraints or peak season surcharges detected. Booking availability is good for the next 30 days.`,
+          impact: 'low', impactLabel: 'Neutral'
+        }
+      ],
+      alternativeAnalysis: `<strong>Road transport</strong> would be preferred if the shipment is time-sensitive (under 72h SLA) or if the cargo requires door-to-door delivery without transshipment. <strong>Rail</strong> offers a middle ground with ~40% cost savings over road while being 3-4x faster than sea.`
+    };
+  }
+
+  function mockDisruptions(origin, dest) {
+    return [
+      {
+        severity: 'high',
+        title: '🌊 Monsoon Season — Bay of Bengal',
+        body: `Heavy monsoon activity detected along the ${origin} seaboard. Expect potential delays of 2-5 days for sea routes during June-September. Wind speeds may exceed 45 knots, affecting vessel schedules.`,
+        region: 'Indian Ocean',
+        affectedModes: ['sea'],
+        probability: '72%',
+        timeframe: 'Next 30 days'
+      },
+      {
+        severity: 'medium',
+        title: '🚧 Port Congestion — Destination Terminal',
+        body: `${dest} port is experiencing moderate congestion with vessel waiting times averaging 18-36 hours. Container yard utilization at 87%. Recommend pre-booking berth slots to minimize delays.`,
+        region: dest,
+        affectedModes: ['sea'],
+        probability: '58%',
+        timeframe: 'Current'
+      },
+      {
+        severity: 'medium',
+        title: '🛣 Highway Construction — Border Region',
+        body: `Major highway upgrade project detected on a segment of the road route between ${origin} and ${dest}. Expect detours adding 120-180 km and 4-6 hours to road transit.`,
+        region: 'Transit corridor',
+        affectedModes: ['road'],
+        probability: '85%',
+        timeframe: 'Next 90 days'
+      },
+      {
+        severity: 'low',
+        title: '✅ Rail Network — Normal Operations',
+        body: `Railway corridors between ${origin} and ${dest} are operating normally. No maintenance windows or capacity constraints detected. On-time performance trending at 94%.`,
+        region: 'Rail corridor',
+        affectedModes: ['rail'],
+        probability: '12%',
+        timeframe: 'Next 30 days'
+      },
+      {
+        severity: 'low',
+        title: '🌤 Weather Outlook — Generally Favorable',
+        body: `Outside of monsoon season, weather conditions along the corridor are predominantly favorable. Average visibility and wind conditions support normal transit for all modes.`,
+        region: 'Full corridor',
+        affectedModes: ['road', 'rail', 'sea'],
+        probability: '15%',
+        timeframe: 'Next 7 days'
+      }
+    ];
+  }
+
+  function mockAnomalies(origin, dest) {
+    return [
+      {
+        type: 'critical',
+        icon: '🚨',
+        title: 'Inefficient Route Detected — Road',
+        description: `The direct road route between ${origin} and ${dest} passes through a high-altitude mountain pass (4,200m) that adds 35% to fuel consumption and 28% to transit time compared to the lowland alternative route.`,
+        recommendation: `Switch to the southern bypass route via the coastal highway. This adds 180 km in distance but reduces fuel cost by $${Math.round(Math.random() * 500 + 200)} and cuts transit time by ${Math.round(Math.random() * 8 + 4)} hours due to better road conditions and lower gradients.`
+      },
+      {
+        type: 'warning',
+        icon: '💸',
+        title: 'Cost Spike — Fuel Surcharge Anomaly',
+        description: `Diesel prices along the ${origin} corridor have spiked 23% above the rolling average ($1.42/L vs $1.15/L avg). This adds an estimated $${Math.round(Math.random() * 300 + 150)} to road transport costs that is not reflected in standard rate cards.`,
+        recommendation: `Consider rail transport for this shipment to avoid fuel cost exposure. Alternatively, lock in fuel hedging contracts for future shipments on this lane. Rail's fixed energy costs are insulated from fuel market volatility.`
+      },
+      {
+        type: 'warning',
+        icon: '⏰',
+        title: 'Time Deviation — Port Processing Delay',
+        description: `Average customs clearance at ${dest} port has increased from 12h to 28h over the past 2 weeks due to new documentation requirements. This extends sea route total time by ~16 hours beyond estimates.`,
+        recommendation: `Pre-submit documentation electronically via the PortNet system 48h before vessel arrival. Consider using a licensed customs broker at the destination to expedite processing. Factor additional buffer into delivery commitments.`
+      },
+      {
+        type: 'info',
+        icon: '📈',
+        title: 'Optimization Opportunity — Consolidation',
+        description: `Analysis of historical shipments on the ${origin} → ${dest} lane shows that cargo volumes could support full-container-load (FCL) pricing instead of less-than-container-load (LCL). Current utilization is averaging 68% per container.`,
+        recommendation: `Consolidate shipments to achieve 85%+ container utilization. This could reduce per-unit shipping cost by 18-25%. Consider weekly batch scheduling instead of on-demand shipping to pool cargo across shipments.`
+      }
+    ];
+  }
+
+  // ─── Render Functions ─────────────────────────
+
+  function renderRouteExplanation(data, origin, dest) {
+    const factorsHTML = data.factors.map(f => `
+      <div class="factor-card">
+        <div class="factor-header">
+          <div class="factor-icon">${f.icon}</div>
+          <div class="factor-title">${f.title}</div>
+        </div>
+        <div class="factor-body">${f.body}</div>
+        <div class="factor-impact impact-${f.impact}">
+          ● ${f.impactLabel}
+        </div>
+      </div>
+    `).join('');
+
+    document.getElementById('route-explanation-content').innerHTML = `
+      <div class="explanation-card">
+        <div class="explanation-header">
+          <div class="explanation-icon">🧠</div>
+          <div>
+            <div class="explanation-title">Route Explanation — ${origin} → ${dest}</div>
+            <div class="explanation-subtitle">Generated by LLM analysis engine · ${new Date().toLocaleTimeString()}</div>
+          </div>
+        </div>
+        <div class="explanation-body">
+
+          <div class="explanation-section">
+            <div class="es-title">📋 Executive Summary</div>
+            <div class="es-content">${data.summary}</div>
+          </div>
+
+          <div class="explanation-section">
+            <div class="es-title">✅ Recommendation</div>
+            <div class="ai-card">
+              <div class="ai-card-header">
+                <div class="ai-orb">🎯</div>
+                <div class="ai-card-title">Recommended: ${data.recommendation.mode.toUpperCase()}</div>
+              </div>
+              <div class="ai-card-body">${data.recommendation.reason}</div>
+            </div>
+          </div>
+
+          <div class="explanation-section">
+            <div class="es-title">🔍 Decision Factors</div>
+            <div class="factor-grid">${factorsHTML}</div>
+          </div>
+
+          <div class="explanation-section">
+            <div class="es-title">🔄 Alternative Analysis</div>
+            <div class="es-content">${data.alternativeAnalysis}</div>
+          </div>
+
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDisruptions(data, origin, dest) {
+    const timelineHTML = data.map(d => `
+      <div class="disruption-item severity-${d.severity}">
+        <div class="di-header">
+          <div class="di-title">${d.title}</div>
+          <div class="di-severity sev-${d.severity}">${d.severity.toUpperCase()}</div>
+        </div>
+        <div class="di-body">${d.body}</div>
+        <div class="di-meta">
+          <div class="di-meta-item">📍 ${d.region}</div>
+          <div class="di-meta-item">🎯 ${d.probability} probability</div>
+          <div class="di-meta-item">⏱ ${d.timeframe}</div>
+          <div class="di-meta-item">🚚 ${d.affectedModes.map(m => m.toUpperCase()).join(', ')}</div>
+        </div>
+      </div>
+    `).join('');
+
+    const highCount = data.filter(d => d.severity === 'high').length;
+    const medCount = data.filter(d => d.severity === 'medium').length;
+    const lowCount = data.filter(d => d.severity === 'low').length;
+
+    document.getElementById('disruption-content').innerHTML = `
+      <div class="explanation-card" style="margin-bottom:24px">
+        <div class="explanation-header">
+          <div class="explanation-icon">⚠️</div>
+          <div>
+            <div class="explanation-title">Disruption Analysis — ${origin} → ${dest}</div>
+            <div class="explanation-subtitle">${data.length} disruptions detected · Last scan: ${new Date().toLocaleTimeString()}</div>
+          </div>
+        </div>
+        <div style="padding:20px;display:flex;gap:12px">
+          <div class="metric-card" style="flex:1;padding:14px;text-align:center">
+            <div class="metric-value" style="font-size:22px;color:var(--red)">${highCount}</div>
+            <div class="metric-label">High</div>
+          </div>
+          <div class="metric-card" style="flex:1;padding:14px;text-align:center">
+            <div class="metric-value" style="font-size:22px;color:var(--amber)">${medCount}</div>
+            <div class="metric-label">Medium</div>
+          </div>
+          <div class="metric-card" style="flex:1;padding:14px;text-align:center">
+            <div class="metric-value" style="font-size:22px;color:var(--green)">${lowCount}</div>
+            <div class="metric-label">Low</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="disruption-timeline">${timelineHTML}</div>
+    `;
+  }
+
+  function renderAnomalies(data, origin, dest) {
+    const cardsHTML = data.map(a => `
+      <div class="anomaly-card">
+        <div class="anomaly-top">
+          <div class="anomaly-icon ${a.type}">
+            ${a.icon}
+          </div>
+          <div class="anomaly-type type-${a.type}">${a.type.toUpperCase()}</div>
+        </div>
+        <div class="anomaly-body">
+          <div class="anomaly-title">${a.title}</div>
+          <div class="anomaly-desc">${a.description}</div>
+          <div class="anomaly-recommendation">
+            <div class="ar-label">💡 Recommendation</div>
+            <div class="ar-text">${a.recommendation}</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    const criticalCount = data.filter(a => a.type === 'critical').length;
+    const warningCount = data.filter(a => a.type === 'warning').length;
+
+    document.getElementById('anomaly-content').innerHTML = `
+      <div class="explanation-card" style="margin-bottom:24px">
+        <div class="explanation-header">
+          <div class="explanation-icon">📊</div>
+          <div>
+            <div class="explanation-title">Anomaly Detection — ${origin} → ${dest}</div>
+            <div class="explanation-subtitle">${data.length} anomalies detected · Scanned ${new Date().toLocaleTimeString()}</div>
+          </div>
+        </div>
+        <div style="padding:20px">
+          <div class="ai-card">
+            <div class="ai-card-header">
+              <div class="ai-orb">🔍</div>
+              <div class="ai-card-title">Scan Summary</div>
+            </div>
+            <div class="ai-card-body">
+              The anomaly detection engine scanned the <strong>${origin} → ${dest}</strong> corridor and identified 
+              <strong style="color:var(--red)">${criticalCount} critical</strong> and 
+              <strong style="color:var(--amber)">${warningCount} warning</strong> level anomalies. 
+              Each anomaly includes a corrective recommendation. Review and apply these to optimize your supply chain operations.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="anomaly-grid">${cardsHTML}</div>
+    `;
+  }
+  </script>
+</body>
+</html>

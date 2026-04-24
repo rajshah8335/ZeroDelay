@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ChainViz · Smart Supply Chain Optimizer</title>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+/* ─── CSS Variables ─────────────────────────────── */
+:root {
+  --bg:       #05070f;
+  --card:     #0b0e1a;
+  --card2:    #0e1220;
+  --border:   #1a2340;
+  --border2:  #243060;
+  --cyan:     #00e5ff;
+  --cyan-dim: rgba(0,229,255,.12);
+  --road:     #f97316;
+  --rail:     #8b5cf6;
+  --sea:      #22d3ee;
+  --green:    #10b981;
+  --text:     #dde6f0;
+  --muted:    #4e6080;
+  --muted2:   #8097b8;
+  --font:     'Rajdhani', sans-serif;
+  --mono:     'JetBrains Mono', monospace;
+}
+
+/* ─── Reset ─────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Header ────────────────────────────────────── */
+#header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: rgba(5,7,15,.95);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  flex-shrink: 0;
+  z-index: 20;
+}
+.logo-wrap { display:flex; align-items:center; gap:12px; }
+.logo-cube {
+  width:34px; height:34px;
+  background: linear-gradient(135deg,var(--cyan),var(--rail));
+  border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px;
+}
+.logo-name {
+  font-size:20px; font-weight:700; letter-spacing:3px;
+  background: linear-gradient(90deg,var(--cyan) 0%,#a0c8ff 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.logo-sub { font-size:10px; color:var(--muted); letter-spacing:3px; text-transform:uppercase; }
+.header-right { display:flex; align-items:center; gap:20px; }
+.live-badge {
+  display:flex; align-items:center; gap:7px;
+  font-size:11px; color:var(--muted2); letter-spacing:1px;
+}
+.dot-pulse {
+  width:7px; height:7px; border-radius:50%; background:var(--green);
+  animation: dot-anim 2s ease-in-out infinite;
+}
+@keyframes dot-anim {
+  0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.5);}
+  50%{box-shadow:0 0 0 5px rgba(16,185,129,0);}
+}
+#utc-clock { font-family:var(--mono); font-size:11px; color:var(--muted); }
+
+/* ─── Body Layout ───────────────────────────────── */
+#body { display:flex; flex:1; overflow:hidden; }
+
+/* ─── Sidebars ──────────────────────────────────── */
+.sidebar {
+  width:290px; flex-shrink:0;
+  background:var(--card);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  overflow-y:auto;
+}
+.sidebar-right {
+  width:320px; flex-shrink:0;
+  background:var(--card);
+  border-left:1px solid var(--border);
+  display:flex; flex-direction:column;
+  overflow-y:auto;
+}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--border2); border-radius:2px}
+
+.section-hd {
+  padding:13px 18px 10px;
+  font-size:10px; font-weight:700; letter-spacing:3px;
+  text-transform:uppercase; color:var(--cyan);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.section-body { padding:16px 18px; display:flex; flex-direction:column; gap:14px; }
+
+/* ─── Form Controls ─────────────────────────────── */
+label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:5px; }
+input, select {
+  width:100%; padding:9px 12px;
+  background:var(--bg); border:1px solid var(--border);
+  color:var(--text); border-radius:6px;
+  font-family:var(--mono); font-size:12px; outline:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+input:focus, select:focus {
+  border-color:var(--cyan);
+  box-shadow:0 0 0 1px rgba(0,229,255,.25);
+}
+select option { background:var(--card); }
+.coord-preview {
+  font-family:var(--mono); font-size:10px; color:var(--muted2);
+  padding:6px 10px; background:var(--bg);
+  border:1px solid var(--border); border-radius:5px;
+  min-height:30px; display:flex; align-items:center;
+  transition:color .2s;
+}
+.coord-preview.found { color:var(--cyan); }
+
+/* Optimize toggles */
+.tog-row { display:flex; gap:5px; }
+.tog {
+  flex:1; padding:7px 0;
+  border:1px solid var(--border); background:transparent;
+  color:var(--muted); border-radius:6px; cursor:pointer;
+  font-family:var(--font); font-size:11px; font-weight:600;
+  letter-spacing:1px; text-transform:uppercase;
+  transition:all .2s;
+}
+.tog.on { border-color:var(--cyan); color:var(--cyan); background:var(--cyan-dim); }
+
+/* Submit button */
+#compute-btn {
+  width:100%; padding:13px;
+  background:linear-gradient(120deg,var(--cyan),#0060ff);
+  border:none; color:#000;
+  font-family:var(--font); font-size:13px; font-weight:700;
+  letter-spacing:3px; text-transform:uppercase;
+  border-radius:8px; cursor:pointer;
+  position:relative; overflow:hidden;
+  transition:all .3s;
+}
+#compute-btn:hover:not(:disabled) {
+  transform:translateY(-1px);
+  box-shadow:0 10px 30px rgba(0,229,255,.3);
+}
+#compute-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+#compute-btn .bar {
+  position:absolute; bottom:0; left:0; height:3px;
+  background:rgba(255,255,255,.5); width:0%;
+  transition:width 3s ease-in-out;
+}
+
+/* Divider */
+.div { height:1px; background:var(--border); margin:2px 0; }
+
+/* Mode toggles */
+.mode-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 12px; border:1px solid var(--border);
+  border-radius:7px; cursor:pointer; transition:all .2s;
+}
+.mode-item.road  { border-left:3px solid var(--road); }
+.mode-item.rail  { border-left:3px solid var(--rail); }
+.mode-item.sea   { border-left:3px solid var(--sea);  }
+.mode-item:hover { background:rgba(255,255,255,.02); }
+.mode-lbl { font-size:13px; font-weight:600; letter-spacing:1px; display:flex; align-items:center; gap:8px; }
+.chk {
+  width:18px; height:18px; border-radius:50%;
+  border:2px solid var(--border); font-size:9px;
+  display:flex; align-items:center; justify-content:center;
+  transition:all .2s;
+}
+.mode-item.on .chk { background:var(--cyan); border-color:var(--cyan); color:#000; }
+
+/* ─── Globe Viewport ────────────────────────────── */
+#globe-wrap {
+  flex:1; position:relative; overflow:hidden;
+  background:radial-gradient(ellipse at 40% 40%, #0d1830 0%, var(--bg) 70%);
+}
+#globe-canvas { width:100%; height:100%; display:block; }
+
+/* Floating chips */
+.chip-wrap { position:absolute; top:16px; left:16px; display:flex; flex-direction:column; gap:7px; }
+.chip {
+  display:flex; align-items:center; gap:8px;
+  background:rgba(11,14,26,.85); backdrop-filter:blur(8px);
+  border:1px solid var(--border); border-radius:6px;
+  padding:6px 12px; font-size:11px;
+}
+.chip-led { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+/* Map toggle */
+#map-toggle-btn {
+  position:absolute; bottom:16px; right:16px;
+  background:rgba(11,14,26,.9); border:1px solid var(--border2);
+  color:var(--cyan); border-radius:8px; padding:9px 15px;
+  cursor:pointer; font-family:var(--font); font-size:11px;
+  font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  backdrop-filter:blur(8px); transition:all .2s; z-index:5;
+  display:flex; align-items:center; gap:8px;
+}
+#map-toggle-btn:hover { border-color:var(--cyan); background:var(--cyan-dim); }
+
+/* Map panel */
+#map-panel {
+  position:absolute; bottom:58px; right:16px;
+  width:420px; height:270px;
+  background:var(--card); border:1px solid var(--border2);
+  border-radius:12px; overflow:hidden; z-index:5;
+  display:none;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+#map-panel.open { display:block; }
+#leaflet-map { width:100%; height:100%; }
+
+/* ─── Right Panel ───────────────────────────────── */
+.empty-state {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:10px; padding:50px 20px; text-align:center;
+  color:var(--muted);
+}
+.empty-icon { font-size:38px; opacity:.25; }
+.empty-tit { font-size:13px; font-weight:600; letter-spacing:2px; }
+.empty-sub { font-size:11px; opacity:.6; line-height:1.6; }
+
+.spinner-wrap { display:flex; flex-direction:column; align-items:center; gap:14px; padding:40px 20px; color:var(--muted); font-size:12px; letter-spacing:2px; }
+.spinner { width:32px; height:32px; border:2px solid var(--border2); border-top-color:var(--cyan); border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Route card */
+.route-card {
+  background:var(--card2); border:1px solid var(--border);
+  border-radius:10px; padding:14px; cursor:pointer;
+  position:relative; overflow:hidden;
+  transition:all .25s;
+}
+.route-card::before { content:''; position:absolute; top:0; left:0; width:3px; height:100%; }
+.route-card.road::before { background:var(--road); }
+.route-card.rail::before { background:var(--rail); }
+.route-card.sea::before  { background:var(--sea);  }
+.route-card:hover { border-color:var(--border2); transform:translateX(2px); }
+.route-card.best { border-color:var(--cyan); background:rgba(0,229,255,.04); }
+.rc-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.rc-type { font-size:15px; font-weight:700; letter-spacing:2px; text-transform:uppercase; display:flex; align-items:center; gap:7px; }
+.opt-badge {
+  background:var(--green); color:#000;
+  font-size:8px; font-weight:700; letter-spacing:1px;
+  padding:2px 8px; border-radius:20px;
+}
+.rc-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.rc-stat { display:flex; flex-direction:column; gap:2px; }
+.rc-stat-lbl { font-size:9px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+.rc-stat-val { font-family:var(--mono); font-size:13px; font-weight:500; }
+.rc-bar-row { display:flex; align-items:center; gap:8px; margin-top:9px; }
+.rc-bar-track { flex:1; height:3px; background:var(--border); border-radius:2px; }
+.rc-bar-fill { height:100%; border-radius:2px; transition:width 1.2s cubic-bezier(.22,1,.36,1); }
+.rc-risk { font-size:10px; color:var(--muted); white-space:nowrap; }
+
+/* AI insight */
+.ai-card {
+  background:linear-gradient(135deg,rgba(0,229,255,.04),rgba(139,92,246,.04));
+  border:1px solid rgba(0,229,255,.18);
+  border-radius:10px; padding:14px;
+}
+.ai-head { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
+.ai-orb {
+  width:22px; height:22px;
+  background:linear-gradient(135deg,var(--cyan),var(--rail));
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:11px; flex-shrink:0;
+}
+.ai-lbl { font-size:10px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--cyan); }
+.ai-body { font-size:12px; line-height:1.65; color:#90a8c8; }
+
+/* Log terminal */
+.log-term {
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:8px; padding:12px;
+  font-family:var(--mono); font-size:10px; color:var(--muted2);
+  max-height:120px; overflow-y:auto; line-height:1.8;
+}
+.log-line { display:flex; gap:8px; }
+.log-ts { color:var(--muted); }
+.log-ok  { color:var(--green); }
+.log-warn{ color:var(--road);  }
+.log-info{ color:var(--cyan);  }
+
+/* Notification */
+#notif {
+  position:fixed; top:60px; left:50%; transform:translateX(-50%) translateY(-8px);
+  background:var(--card2); border:1px solid var(--border2);
+  border-radius:8px; padding:10px 18px;
+  font-size:12px; letter-spacing:1px;
+  z-index:100; opacity:0; transition:all .3s;
+  pointer-events:none; white-space:nowrap;
+}
+#notif.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+</style>
+</head>
+<body>
+
+<!-- ─── Header ──────────────────────────────────── -->
+<div id="header">
+  <div class="logo-wrap">
+    <div class="logo-cube">⛓</div>
+    <div>
+      <div class="logo-name">CHAINVIZ</div>
+      <div class="logo-sub">Smart Supply Chain Optimizer</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge">
+      <div class="dot-pulse"></div>
+      AI Engine Online
+    </div>
+    <div id="utc-clock">--:--:-- UTC</div>
+  </div>
+</div>
+
+<!-- ─── Body ────────────────────────────────────── -->
+<div id="body">
+
+  <!-- Left Sidebar ─── -->
+  <div class="sidebar">
+    <div class="section-hd">Route Configuration</div>
+    <div class="section-body">
+
+      <div>
+        <label>Origin</label>
+        <input id="origin-input" type="text" placeholder="e.g. Mumbai, India" />
+        <div class="coord-preview" id="origin-coords" style="margin-top:5px">Enter origin above</div>
+      </div>
+
+      <div>
+        <label>Destination</label>
+        <input id="dest-input" type="text" placeholder="e.g. Shanghai, China" />
+        <div class="coord-preview" id="dest-coords" style="margin-top:5px">Enter destination above</div>
+      </div>
+
+      <div>
+        <label>Optimize For</label>
+        <div class="tog-row">
+          <button class="tog on" data-opt="balanced">Balanced</button>
+          <button class="tog" data-opt="cost">Cost</button>
+          <button class="tog" data-opt="time">Time</button>
+        </div>
+      </div>
+
+      <div>
+        <label>Cargo Type</label>
+        <select id="cargo-type">
+          <option value="general">General Freight</option>
+          <option value="perishable">Perishable Goods</option>
+          <option value="heavy">Heavy Machinery</option>
+          <option value="hazmat">Hazardous Materials</option>
+          <option value="bulk">Bulk Commodities</option>
+        </select>
+      </div>
+
+      <div class="div"></div>
+
+      <button id="compute-btn" onclick="computeRoutes()">
+        <span id="btn-label">Compute Routes</span>
+        <div class="bar" id="btn-bar"></div>
+      </button>
+
+      <div class="div"></div>
+
+      <div>
+        <label>Visible Transport Modes</label>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div class="mode-item road on" id="m-road" onclick="toggleMode('road')">
+            <span class="mode-lbl">🚛 Road</span>
+            <div class="chk">✓</div>
+          </div>
+          <div class="mode-item rail on" id="m-rail" onclick="toggleMode('rail')">
+            <span class="mode-lbl">🚂 Rail</span>
+            <div class="chk">✓</div>
+          </div>
+          <div class="mode-item sea on" id="m-sea" onclick="toggleMode('sea')">
+            <span class="mode-lbl">🚢 Sea</span>
+            <div class="chk">✓</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label>Flask API Endpoint</label>
+        <input id="api-url" type="text" value="http://localhost:5000" />
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Globe Viewport ─── -->
+  <div id="globe-wrap">
+    <canvas id="globe-canvas"></canvas>
+
+    <div class="chip-wrap">
+      <div class="chip" id="status-chip">
+        <div class="chip-led" style="background:var(--green)"></div>
+        <span id="status-txt">Globe Ready · Drag to Rotate</span>
+      </div>
+      <div class="chip" id="route-chip" style="display:none">
+        <div class="chip-led" style="background:var(--cyan); animation:dot-anim 1.5s infinite"></div>
+        <span id="route-chip-txt">--</span>
+      </div>
+    </div>
+
+    <button id="map-toggle-btn" onclick="toggleMap()">
+      🗺 <span id="map-btn-txt">Show Map</span>
+    </button>
+
+    <div id="map-panel">
+      <div id="leaflet-map"></div>
+    </div>
+  </div>
+
+  <!-- Right Sidebar ─── -->
+  <div class="sidebar-right">
+    <div class="section-hd">Analysis Results</div>
+    <div class="section-body" id="results-body">
+      <div class="empty-state">
+        <div class="empty-icon">📡</div>
+        <div class="empty-tit">Awaiting Input</div>
+        <div class="empty-sub">Enter origin & destination<br>then click Compute Routes</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /body -->
+
+<div id="notif"></div>
+
+<!-- ─── Script ──────────────────────────────────── -->
+<script>
+/* ══════════════════════════════════════════════════
+   CLOCK
+══════════════════════════════════════════════════ */
+function tickClock(){
+  const d=new Date();
+  document.getElementById('utc-clock').textContent=
+    d.toUTCString().slice(17,25)+' UTC';
+}
+setInterval(tickClock,1000); tickClock();
+
+/* ══════════════════════════════════════════════════
+   THREE.JS SETUP
+══════════════════════════════════════════════════ */
+const canvas = document.getElementById('globe-canvas');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(canvas.offsetWidth, canvas.offsetHeight);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, canvas.offsetWidth/canvas.offsetHeight, 0.1, 500);
+camera.position.z = 2.8;
+
+window.addEventListener('resize', ()=>{
+  renderer.setSize(canvas.offsetWidth, canvas.offsetHeight);
+  camera.aspect = canvas.offsetWidth/canvas.offsetHeight;
+  camera.updateProjectionMatrix();
+});
+
+const GLOBE_R = 1;
+const globeG = new THREE.Group();
+scene.add(globeG);
+
+/* ── Globe sphere ── */
+const sphGeo = new THREE.SphereGeometry(GLOBE_R, 64, 64);
+const sphMat = new THREE.MeshPhongMaterial({
+  color:0x070e22, emissive:0x020812,
+  transparent:true, opacity:0.92
+});
+globeG.add(new THREE.Mesh(sphGeo, sphMat));
+
+/* ── Atmosphere shells ── */
+[[GLOBE_R+0.04, 0x002255, 0.14, THREE.BackSide],
+ [GLOBE_R+0.09, 0x00bbdd, 0.04, THREE.BackSide]].forEach(([r,c,o,s])=>{
+  const m=new THREE.MeshPhongMaterial({color:c,transparent:true,opacity:o,side:s});
+  globeG.add(new THREE.Mesh(new THREE.SphereGeometry(r,32,32),m));
+});
+
+/* ── Grid lines ── */
+function addGrid(){
+  const lm=new THREE.LineBasicMaterial({color:0x1a2a50,transparent:true,opacity:0.55});
+  // Lat
+  for(let lat=-80;lat<=80;lat+=20){
+    const pts=[];
+    for(let lng=0;lng<=360;lng+=3) pts.push(llV3(lat,lng,GLOBE_R+.001));
+    globeG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm));
+  }
+  // Lng
+  for(let lng=0;lng<360;lng+=20){
+    const pts=[];
+    for(let lat=-90;lat<=90;lat+=3) pts.push(llV3(lat,lng,GLOBE_R+.001));
+    globeG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm));
+  }
+}
+addGrid();
+
+/* ── Hub dots ── */
+const HUBS=[
+  {name:'Mumbai',lat:19.0,lng:72.8},{name:'Shanghai',lat:31.2,lng:121.5},
+  {name:'Singapore',lat:1.35,lng:103.8},{name:'Rotterdam',lat:51.9,lng:4.5},
+  {name:'Dubai',lat:25.2,lng:55.3},{name:'Los Angeles',lat:34.0,lng:-118.2},
+  {name:'New York',lat:40.7,lng:-74.0},{name:'Hong Kong',lat:22.3,lng:114.2},
+  {name:'London',lat:51.5,lng:-.1},{name:'Tokyo',lat:35.7,lng:139.7},
+  {name:'Sydney',lat:-33.9,lng:151.2},{name:'Sao Paulo',lat:-23.5,lng:-46.6},
+  {name:'Nairobi',lat:-1.3,lng:36.8},{name:'Cairo',lat:30.0,lng:31.2},
+  {name:'Guangzhou',lat:23.1,lng:113.3},
+];
+
+const hubGrp=new THREE.Group();
+globeG.add(hubGrp);
+HUBS.forEach(h=>{
+  const pos=llV3(h.lat,h.lng,GLOBE_R+.007);
+  const dot=new THREE.Mesh(
+    new THREE.SphereGeometry(.007,8,8),
+    new THREE.MeshBasicMaterial({color:0x00ccff}));
+  dot.position.copy(pos);
+  hubGrp.add(dot);
+  const ring=new THREE.Mesh(
+    new THREE.SphereGeometry(.015,8,8),
+    new THREE.MeshBasicMaterial({color:0x00ccff,transparent:true,opacity:.15,wireframe:true}));
+  ring.position.copy(pos);
+  hubGrp.add(ring);
+});
+
+/* ── Stars ── */
+(()=>{
+  const verts=[];
+  for(let i=0;i<4000;i++){
+    const r=60+Math.random()*160;
+    const t=Math.random()*Math.PI*2, p=Math.acos(2*Math.random()-1);
+    verts.push(r*Math.sin(p)*Math.cos(t),r*Math.cos(p),r*Math.sin(p)*Math.sin(t));
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+  scene.add(new THREE.Points(geo,new THREE.PointsMaterial({color:0xffffff,size:.25,transparent:true,opacity:.45})));
+})();
+
+/* ── Lighting ── */
+scene.add(new THREE.AmbientLight(0x223355,1.2));
+const dL=new THREE.DirectionalLight(0x4488cc,2);
+dL.position.set(5,3,5);
+scene.add(dL);
+scene.add(Object.assign(new THREE.DirectionalLight(0x001133,.4),{position:{x:-5,y:-3,z:-5}}));
+
+/* ══════════════════════════════════════════════════
+   HELPER: lat/lng → Vector3
+══════════════════════════════════════════════════ */
+function llV3(lat,lng,r){
+  const phi=(90-lat)*(Math.PI/180);
+  const theta=(lng+180)*(Math.PI/180);
+  return new THREE.Vector3(
+    -r*Math.sin(phi)*Math.cos(theta),
+     r*Math.cos(phi),
+     r*Math.sin(phi)*Math.sin(theta));
+}
+
+/* ══════════════════════════════════════════════════
+   ARC / PARTICLE SYSTEM
+══════════════════════════════════════════════════ */
+const COLORS={road:0xf97316,rail:0x8b5cf6,sea:0x22d3ee};
+const HEIGHTS={road:.22,rail:.35,sea:.58};
+const SPEEDS={road:.004,rail:.0028,sea:.0013};
+const MODE_VIS={road:true,rail:true,sea:true};
+
+let arcObjs={}, particleObjs={};
+
+function clearAllArcs(){
+  ['road','rail','sea'].forEach(m=>{
+    if(arcObjs[m])  { globeG.remove(arcObjs[m].line);  arcObjs[m]=null;  }
+    if(particleObjs[m]){ globeG.remove(particleObjs[m].mesh); particleObjs[m]=null; }
+  });
+}
+
+function buildArc(lat1,lng1,lat2,lng2,mode){
+  const s=llV3(lat1,lng1,GLOBE_R), e=llV3(lat2,lng2,GLOBE_R);
+  const h=HEIGHTS[mode];
+  // Control point arcs upward from sphere midpoint
+  const ctrl=s.clone().add(e).normalize().multiplyScalar(GLOBE_R+h);
+  const curve=new THREE.QuadraticBezierCurve3(s,ctrl,e);
+  const pts=curve.getPoints(100);
+
+  // Dashed look via drawn segments
+  const geo=new THREE.BufferGeometry().setFromPoints(pts);
+  const mat=new THREE.LineBasicMaterial({color:COLORS[mode],transparent:true,opacity:.75});
+  const line=new THREE.Line(geo,mat);
+  line.visible=MODE_VIS[mode];
+  globeG.add(line);
+  arcObjs[mode]={line,curve};
+
+  // Particle
+  const pGeo=new THREE.SphereGeometry(.02,8,8);
+  const pMat=new THREE.MeshBasicMaterial({color:COLORS[mode]});
+  const mesh=new THREE.Mesh(pGeo,pMat);
+  // Glow
+  const gMat=new THREE.MeshBasicMaterial({color:COLORS[mode],transparent:true,opacity:.3});
+  mesh.add(new THREE.Mesh(new THREE.SphereGeometry(.04,8,8),gMat));
+  mesh.visible=MODE_VIS[mode];
+  globeG.add(mesh);
+  particleObjs[mode]={mesh,t:Math.random(),speed:SPEEDS[mode]};
+}
+
+/* ══════════════════════════════════════════════════
+   MOUSE / TOUCH ROTATION
+══════════════════════════════════════════════════ */
+let drag=false, prevXY={x:0,y:0};
+let tgtX=0.15, tgtY=0, curX=0.15, curY=0;
+let autoRotate=true;
+
+canvas.addEventListener('mousedown',e=>{drag=true;prevXY={x:e.clientX,y:e.clientY};autoRotate=false;});
+canvas.addEventListener('mousemove',e=>{
+  if(!drag)return;
+  tgtY+=(e.clientX-prevXY.x)*.005; tgtX+=(e.clientY-prevXY.y)*.005;
+  tgtX=Math.max(-1.2,Math.min(1.2,tgtX));
+  prevXY={x:e.clientX,y:e.clientY};
+});
+canvas.addEventListener('mouseup',()=>drag=false);
+canvas.addEventListener('mouseleave',()=>drag=false);
+canvas.addEventListener('touchstart',e=>{drag=true;prevXY={x:e.touches[0].clientX,y:e.touches[0].clientY};autoRotate=false;e.preventDefault();},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  if(!drag)return;
+  tgtY+=(e.touches[0].clientX-prevXY.x)*.005; tgtX+=(e.touches[0].clientY-prevXY.y)*.005;
+  prevXY={x:e.touches[0].clientX,y:e.touches[0].clientY};e.preventDefault();
+},{passive:false});
+canvas.addEventListener('touchend',()=>drag=false);
+
+/* ══════════════════════════════════════════════════
+   RENDER LOOP
+══════════════════════════════════════════════════ */
+function animLoop(){
+  requestAnimationFrame(animLoop);
+  if(autoRotate) tgtY+=.0008;
+  curX+=(tgtX-curX)*.08; curY+=(tgtY-curY)*.05;
+  globeG.rotation.x=curX; globeG.rotation.y=curY;
+  // Particle update
+  const now=Date.now();
+  ['road','rail','sea'].forEach(m=>{
+    const p=particleObjs[m];
+    if(!p||!p.mesh.visible)return;
+    p.t+=p.speed; if(p.t>1)p.t=0;
+    const arc=arcObjs[m];
+    if(arc){ p.mesh.position.copy(arc.curve.getPoint(p.t)); }
+    const s=1+.25*Math.sin(now*.012+m.length);
+    p.mesh.scale.setScalar(s);
+  });
+  renderer.render(scene,camera);
+}
+animLoop();
+
+/* ══════════════════════════════════════════════════
+   GEOCODING (Nominatim, free)
+══════════════════════════════════════════════════ */
+const geoTimers={};
+const geoCache={};
+
+async function geocode(q){
+  if(geoCache[q]) return geoCache[q];
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
+      {headers:{'Accept':'application/json'}});
+    const d=await r.json();
+    if(d.length){
+      const res={lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon),
+        label:d[0].display_name.split(',').slice(0,2).join(',').trim()};
+      geoCache[q]=res; return res;
+    }
+  }catch{}
+  return null;
+}
+
+function liveGeocode(inputId, displayId){
+  clearTimeout(geoTimers[inputId]);
+  geoTimers[inputId]=setTimeout(async()=>{
+    const val=document.getElementById(inputId).value.trim();
+    const el=document.getElementById(displayId);
+    if(val.length<3){el.textContent='Enter location above';el.classList.remove('found');return;}
+    el.textContent='Locating…';el.classList.remove('found');
+    const res=await geocode(val);
+    if(res){
+      el.textContent=`${res.lat.toFixed(4)}°, ${res.lng.toFixed(4)}° · ${res.label}`;
+      el.classList.add('found');
+      el.dataset.lat=res.lat; el.dataset.lng=res.lng;
+    } else {
+      el.textContent='Location not found'; el.classList.remove('found');
+    }
+  },700);
+}
+
+document.getElementById('origin-input').addEventListener('input',()=>liveGeocode('origin-input','origin-coords'));
+document.getElementById('dest-input').addEventListener('input',()=>liveGeocode('dest-input','dest-coords'));
+
+/* ══════════════════════════════════════════════════
+   OPTIMIZE TOGGLES
+══════════════════════════════════════════════════ */
+let selOpt='balanced';
+document.querySelectorAll('.tog').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.tog').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    selOpt=b.dataset.opt;
+  });
+});
+
+/* ══════════════════════════════════════════════════
+   MODE VISIBILITY
+══════════════════════════════════════════════════ */
+function toggleMode(m){
+  const el=document.getElementById('m-'+m);
+  el.classList.toggle('on');
+  const vis=el.classList.contains('on');
+  MODE_VIS[m]=vis;
+  if(arcObjs[m])     arcObjs[m].line.visible=vis;
+  if(particleObjs[m]) particleObjs[m].mesh.visible=vis;
+}
+
+/* ══════════════════════════════════════════════════
+   HAVERSINE DISTANCE
+══════════════════════════════════════════════════ */
+function haversine(a,b,c,d){
+  const R=6371,f=(c-a)*Math.PI/180,g=(d-b)*Math.PI/180;
+  const h=Math.sin(f/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(g/2)**2;
+  return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
+}
+
+/* ══════════════════════════════════════════════════
+   MOCK DATA GENERATOR
+══════════════════════════════════════════════════ */
+function mockData(lat1,lng1,lat2,lng2){
+  const d=haversine(lat1,lng1,lat2,lng2);
+  const origin=document.getElementById('origin-input').value;
+  const dest=document.getElementById('dest-input').value;
+
+  const road={mode:'road',dist_km:Math.round(d*1.32),time_h:Math.round(d*1.32/68),
+    cost_usd:Math.round(d*1.32*2.15),co2_kg:Math.round(d*1.32*0.148),risk:'Low'};
+  const rail={mode:'rail',dist_km:Math.round(d*1.18),time_h:Math.round(d*1.18/75),
+    cost_usd:Math.round(d*1.18*1.35),co2_kg:Math.round(d*1.18*0.04),risk:'Low'};
+  const sea={mode:'sea',dist_km:Math.round(d*1.5),time_h:Math.round(d*1.5/18),
+    cost_usd:Math.round(d*1.5*0.55),co2_kg:Math.round(d*1.5*0.009),risk:'Medium'};
+
+  let rec='sea';
+  if(selOpt==='time') rec=d<800?'road':'rail';
+  else if(selOpt==='cost') rec=d>600?'sea':'road';
+
+  const insights={
+    balanced:`Balanced analysis for the ${origin} → ${dest} corridor (${Math.round(d)} km): Sea freight offers lowest cost for non-urgent cargo. Rail provides good speed-cost balance for inland routes. Road is best for last-mile flexibility. CO₂ advantage strongly favours sea (${Math.round(sea.co2_kg)} kg vs road's ${Math.round(road.co2_kg)} kg).`,
+    cost:`Cost-optimized route for ${origin} → ${dest}: Sea freight at $${sea.cost_usd.toLocaleString()} is most economical — ${Math.round((1-sea.cost_usd/road.cost_usd)*100)}% cheaper than road. Consider port consolidation to reduce per-unit costs further. Bulk commodity surcharges may apply.`,
+    time:`Time-optimized route for ${origin} → ${dest}: ${d<800?'Road freight is fastest for short hauls under 800 km. Consider dedicated trucking for time-sensitive shipments.':'Rail freight cuts transit by ~20% vs road on this corridor. Priority rail service may be bookable for urgent cargo.'} Disruption buffer of 15–20% recommended.`,
+  };
+
+  return {routes:[road,rail,sea],rec,insight:insights[selOpt],total_km:Math.round(d),
+    logs:[
+      {t:'AI',cls:'log-info',msg:`Geocoded: ${origin} ↔ ${dest}`},
+      {t:'ROUTE',cls:'log-ok',msg:`Computed 3 transport modes`},
+      {t:'COST',cls:'log-ok',msg:`Pricing model applied (${selOpt})`},
+      {t:'AI',cls:'log-ok',msg:`Recommendation: ${rec.toUpperCase()}`},
+    ]};
+}
+
+/* ══════════════════════════════════════════════════
+   MAIN COMPUTE
+══════════════════════════════════════════════════ */
+let curOrigin=null, curDest=null;
+
+async function computeRoutes(){
+  const oEl=document.getElementById('origin-coords');
+  const dEl=document.getElementById('dest-coords');
+  const oLat=parseFloat(oEl.dataset.lat), oLng=parseFloat(oEl.dataset.lng);
+  const dLat=parseFloat(dEl.dataset.lat), dLng=parseFloat(dEl.dataset.lng);
+
+  if(!oLat||!dLat||isNaN(oLat)||isNaN(dLat)){
+    toast('⚠ Geocode both origin and destination first','#f97316');return;
+  }
+
+  curOrigin={lat:oLat,lng:oLng};
+  curDest={lat:dLat,lng:dLng};
+
+  const btn=document.getElementById('compute-btn');
+  btn.disabled=true;
+  document.getElementById('btn-label').textContent='Computing…';
+  document.getElementById('btn-bar').style.width='72%';
+
+  document.getElementById('results-body').innerHTML=
+    '<div class="spinner-wrap"><div class="spinner"></div><span style="letter-spacing:2px;font-size:11px">Analyzing routes…</span></div>';
+
+  document.getElementById('route-chip').style.display='flex';
+  document.getElementById('route-chip-txt').textContent='Routing…';
+
+  // Try Flask API
+  let data=null;
+  try{
+    const apiBase=document.getElementById('api-url').value.trim();
+    const res=await fetch(`${apiBase}/api/route`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        origin:document.getElementById('origin-input').value,
+        destination:document.getElementById('dest-input').value,
+        optimize:selOpt,
+        cargo:document.getElementById('cargo-type').value,
+      }),
+      signal:AbortSignal.timeout(4000),
+    });
+    if(res.ok) data=await res.json();
+  }catch{/* use mock */}
+
+  if(!data) data=mockData(oLat,oLng,dLat,dLng);
+
+  // Visualize arcs
+  clearAllArcs();
+  setTimeout(()=>{
+    buildArc(oLat,oLng,dLat,dLng,'road');
+    buildArc(oLat,oLng,dLat,dLng,'rail');
+    buildArc(oLat,oLng,dLat,dLng,'sea');
+    // Orient globe
+    const midLat=(oLat+dLat)/2, midLng=(oLng+dLng)/2;
+    tgtY=-(midLng*Math.PI/180)-Math.PI;
+    tgtX=-(midLat*Math.PI/180)*.5;
+  },200);
+
+  renderResults(data);
+  document.getElementById('route-chip-txt').textContent=`Optimal: ${(data.rec||'--').toUpperCase()}`;
+
+  if(leafMap) updateLeafMap(oLat,oLng,dLat,dLng);
+  if(document.getElementById('map-panel').classList.contains('open')&&!leafMap) initLeafMap();
+
+  btn.disabled=false;
+  document.getElementById('btn-label').textContent='Compute Routes';
+  document.getElementById('btn-bar').style.width='0%';
+  toast('✓ Routes computed successfully','#10b981');
+}
+
+/* ══════════════════════════════════════════════════
+   RENDER RESULTS
+══════════════════════════════════════════════════ */
+function renderResults(data){
+  const {routes,rec,insight,total_km,logs}=data;
+  const modeColor={road:'var(--road)',rail:'var(--rail)',sea:'var(--sea)'};
+  const modeEmoji={road:'🚛',rail:'🚂',sea:'🚢'};
+  const maxCost=Math.max(...routes.map(r=>r.cost_usd));
+
+  // Sort: recommended first
+  const sorted=[...routes].sort((a,b)=>a.mode===rec?-1:b.mode===rec?1:0);
+
+  const cardsHTML=sorted.map(r=>`
+    <div class="route-card ${r.mode} ${r.mode===rec?'best':''}" onclick="highlightArc('${r.mode}')">
+      <div class="rc-head">
+        <div class="rc-type" style="color:${modeColor[r.mode]}">
+          ${modeEmoji[r.mode]} ${r.mode.toUpperCase()}
+        </div>
+        ${r.mode===rec?'<span class="opt-badge">OPTIMAL</span>':''}
+      </div>
+      <div class="rc-grid">
+        <div class="rc-stat">
+          <div class="rc-stat-lbl">Distance</div>
+          <div class="rc-stat-val">${r.dist_km.toLocaleString()} km</div>
+        </div>
+        <div class="rc-stat">
+          <div class="rc-stat-lbl">Est. Time</div>
+          <div class="rc-stat-val">${r.time_h>48?Math.round(r.time_h/24)+'d '+Math.round(r.time_h%24)+'h':r.time_h+'h'}</div>
+        </div>
+        <div class="rc-stat">
+          <div class="rc-stat-lbl">Est. Cost</div>
+          <div class="rc-stat-val">$${r.cost_usd.toLocaleString()}</div>
+        </div>
+        <div class="rc-stat">
+          <div class="rc-stat-lbl">CO₂ Emis.</div>
+          <div class="rc-stat-val">${r.co2_kg.toLocaleString()} kg</div>
+        </div>
+      </div>
+      <div class="rc-bar-row">
+        <div class="rc-risk">Risk: ${r.risk||'Low'}</div>
+        <div class="rc-bar-track">
+          <div class="rc-bar-fill" style="width:${Math.round(r.cost_usd/maxCost*100)}%;background:${modeColor[r.mode]}"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">${Math.round(r.cost_usd/maxCost*100)}%</div>
+      </div>
+    </div>`).join('');
+
+  const logsHTML=(logs||[]).map(l=>`
+    <div class="log-line">
+      <span class="log-ts">${new Date().toLocaleTimeString('en',{hour12:false})}</span>
+      <span class="${l.cls}">[${l.t}]</span>
+      <span>${l.msg}</span>
+    </div>`).join('');
+
+  document.getElementById('results-body').innerHTML=`
+    <div style="font-size:10px;color:var(--muted);letter-spacing:2px">
+      TOTAL DISTANCE · ${total_km.toLocaleString()} km
+    </div>
+    ${cardsHTML}
+    <div class="ai-card">
+      <div class="ai-head">
+        <div class="ai-orb">🤖</div>
+        <div class="ai-lbl">AI Insight</div>
+      </div>
+      <div class="ai-body">${insight}</div>
+    </div>
+    <div>
+      <div class="section-hd" style="padding:0 0 8px;border:none;margin-bottom:8px">System Log</div>
+      <div class="log-term">${logsHTML}</div>
+    </div>
+  `;
+}
+
+function highlightArc(mode){
+  ['road','rail','sea'].forEach(m=>{
+    if(arcObjs[m]) arcObjs[m].line.material.opacity=m===mode?1.0:.2;
+    if(particleObjs[m]) particleObjs[m].mesh.visible=m===mode;
+  });
+  setTimeout(()=>{
+    ['road','rail','sea'].forEach(m=>{
+      if(arcObjs[m]) arcObjs[m].line.material.opacity=MODE_VIS[m]?.75:.0;
+      if(particleObjs[m]) particleObjs[m].mesh.visible=MODE_VIS[m];
+    });
+  },2500);
+}
+
+/* ══════════════════════════════════════════════════
+   LEAFLET MAP
+══════════════════════════════════════════════════ */
+let leafMap=null, leafLayers=[];
+
+function initLeafMap(){
+  if(leafMap) return;
+  leafMap=L.map('leaflet-map',{zoomControl:true}).setView([20,80],3);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'©OpenStreetMap ©CartoDB',
+    subdomains:'abcd', maxZoom:19
+  }).addTo(leafMap);
+}
+
+function updateLeafMap(lat1,lng1,lat2,lng2){
+  if(!leafMap) initLeafMap();
+  leafLayers.forEach(l=>l.remove()); leafLayers=[];
+
+  const mColors={road:'#f97316',rail:'#8b5cf6',sea:'#22d3ee'};
+  const mDash={road:null,rail:'8,4',sea:'4,8'};
+
+  Object.keys(mColors).forEach(m=>{
+    if(!MODE_VIS[m]) return;
+    const l=L.polyline([[lat1,lng1],[lat2,lng2]],{
+      color:mColors[m], weight:2, opacity:.8,
+      dashArray:mDash[m], geodesic:true,
+    }).addTo(leafMap);
+    leafLayers.push(l);
+  });
+
+  const oMark=L.circleMarker([lat1,lng1],{radius:7,color:'#00e5ff',fillColor:'#00e5ff',fillOpacity:.8})
+    .bindTooltip('Origin',{permanent:false}).addTo(leafMap);
+  const dMark=L.circleMarker([lat2,lng2],{radius:7,color:'#f97316',fillColor:'#f97316',fillOpacity:.8})
+    .bindTooltip('Destination',{permanent:false}).addTo(leafMap);
+  leafLayers.push(oMark,dMark);
+
+  const bounds=L.latLngBounds([[lat1,lng1],[lat2,lng2]]);
+  leafMap.fitBounds(bounds.pad(.3));
+}
+
+let mapOpen=false;
+function toggleMap(){
+  mapOpen=!mapOpen;
+  const p=document.getElementById('map-panel');
+  p.classList.toggle('open',mapOpen);
+  document.getElementById('map-btn-txt').textContent=mapOpen?'Hide Map':'Show Map';
+  if(mapOpen){
+    if(!leafMap) initLeafMap();
+    if(curOrigin&&curDest) updateLeafMap(curOrigin.lat,curOrigin.lng,curDest.lat,curDest.lng);
+    setTimeout(()=>leafMap&&leafMap.invalidateSize(),50);
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════════ */
+function toast(msg,color='#00e5ff'){
+  const el=document.getElementById('notif');
+  el.textContent=msg; el.style.color=color; el.style.borderColor=color;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),3000);
+}
+</script>
+</body>
+</html>
